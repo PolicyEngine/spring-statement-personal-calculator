@@ -630,16 +630,15 @@ export default function SpringStatementCalculator() {
       <header className="narrative-hero">
         <h1>Spring Statement Personal Calculator</h1>
         <p className="narrative-lead">
-          See how the <strong>Spring Statement</strong> policy changes affect
-          your household's taxes and benefits before and after the Spring
-          Statement.
+          See how the <strong>Spring Statement 2026</strong> policy changes
+          affect your household's taxes and benefits before and after the
+          Spring Statement.
         </p>
       </header>
 
       <p className="narrative-about">
-        The Spring Statement 2025 updated OBR inflation forecasts, which
-        changes how benefits and tax thresholds are uprated. This calculator
-        uses{" "}
+        The Spring Statement 2026 updated OBR forecasts, which change how
+        benefits and tax thresholds are uprated. This calculator uses{" "}
         <a href="https://policyengine.org" target="_blank" rel="noopener noreferrer">
           PolicyEngine UK
         </a>{" "}
@@ -1083,7 +1082,7 @@ export default function SpringStatementCalculator() {
             <section className="narrative-section">
               <h2>Impact over time</h2>
               <p>
-                Net household income impact for each tax year as CPI forecasts
+                Net household income impact for each tax year as OBR forecasts
                 diverge before and after the Spring Statement.
               </p>
               {multiYearLoading ? (

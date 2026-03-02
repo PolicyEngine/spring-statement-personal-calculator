@@ -9,7 +9,7 @@ from policyengine_uk import Simulation, Scenario
 
 CPI_YEARS = range(2025, 2031)
 
-# OBR CPI YoY growth forecasts from Spring Statement 2025
+# OBR CPI YoY growth forecasts from Spring Statement 2026
 SPRING_CPI = {
     2025: 0.0360,
     2026: 0.0330,
