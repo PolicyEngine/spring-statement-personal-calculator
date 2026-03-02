@@ -1,0 +1,7 @@
+{
+  "name": "spring-statement-calculator",
+  "framework": "vite",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "installCommand": "npm install"
+}
