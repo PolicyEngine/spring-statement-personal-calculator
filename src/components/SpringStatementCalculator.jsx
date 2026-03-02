@@ -4,6 +4,14 @@ import "./SpringStatementCalculator.css";
 
 const API_URL = import.meta.env.VITE_API_URL || "https://policyengine--spring-statement-calculator-api-fastapi-app.modal.run";
 
+const STUDENT_LOAN_PLANS = [
+  { value: "NO_STUDENT_LOAN", label: "None" },
+  { value: "PLAN_1", label: "Plan 1", description: "Started before Sept 2012 (Eng/Wales) or Scotland/NI" },
+  { value: "PLAN_2", label: "Plan 2", description: "Started Sept 2012+ (England/Wales)" },
+  { value: "PLAN_4", label: "Plan 4", description: "Scotland" },
+  { value: "PLAN_5", label: "Plan 5", description: "Started Aug 2023+ (England)" },
+];
+
 const COLORS = {
   positive: "#059669", // Green — household gains
   negative: "#dc2626", // Red — household loses
@@ -75,8 +83,14 @@ export default function SpringStatementCalculator() {
   const [draftRegion, setDraftRegion] = useState("LONDON");
   const [draftCouncilTaxBand, setDraftCouncilTaxBand] = useState("D");
   const [draftTenureType, setDraftTenureType] = useState("RENT_PRIVATELY");
+  const [draftSelfEmploymentIncome, setDraftSelfEmploymentIncome] = useState(0);
   const [draftChildcare, setDraftChildcare] = useState(0);
   const [draftStudentLoan, setDraftStudentLoan] = useState("NO_STUDENT_LOAN");
+  const [draftHasPostgrad, setDraftHasPostgrad] = useState(false);
+  const [draftLoanBalance, setDraftLoanBalance] = useState(40000);
+  const [draftSalaryGrowthRate, setDraftSalaryGrowthRate] = useState(0.03);
+  const [draftInterestRate, setDraftInterestRate] = useState(0.04);
+  const [studentLoanExpanded, setStudentLoanExpanded] = useState(false);
   const [moreDetailsExpanded, setMoreDetailsExpanded] = useState(false);
   const [expandedPrograms, setExpandedPrograms] = useState({});
   const [expandedGroups, setExpandedGroups] = useState({});
@@ -118,8 +132,15 @@ export default function SpringStatementCalculator() {
     setMtrData(null);
     setMtrLoading(true);
 
+    // If no undergrad plan selected but postgrad checked, use POSTGRADUATE
+    const effectiveStudentLoanPlan =
+      draftStudentLoan === "NO_STUDENT_LOAN" && draftHasPostgrad
+        ? "POSTGRADUATE"
+        : draftStudentLoan;
+
     const requestBody = {
       employment_income: draftIncome,
+      self_employment_income: draftSelfEmploymentIncome,
       num_children: draftChildren,
       children_ages: draftChildrenAges.length > 0 ? draftChildrenAges : null,
       monthly_rent: draftRent,
@@ -131,7 +152,11 @@ export default function SpringStatementCalculator() {
       council_tax_band: draftCouncilTaxBand,
       tenure_type: draftTenureType,
       childcare_expenses: draftChildcare,
-      student_loan_plan: draftStudentLoan,
+      student_loan_plan: effectiveStudentLoanPlan,
+      has_postgrad_loan: draftHasPostgrad,
+      salary_growth_rate: draftSalaryGrowthRate,
+      loan_balance: draftLoanBalance,
+      interest_rate: draftInterestRate,
       year: draftYear,
     };
 
@@ -211,8 +236,13 @@ export default function SpringStatementCalculator() {
     draftRegion,
     draftCouncilTaxBand,
     draftTenureType,
+    draftSelfEmploymentIncome,
     draftChildcare,
     draftStudentLoan,
+    draftHasPostgrad,
+    draftLoanBalance,
+    draftSalaryGrowthRate,
+    draftInterestRate,
   ]);
 
   // Program structure and groups from API response
@@ -644,7 +674,7 @@ export default function SpringStatementCalculator() {
         </a>{" "}
         to simulate your household's taxes, benefits, and net income before
         and after the Spring Statement. Results are annual amounts for the
-        selected tax year.
+        selected fiscal year.
       </p>
 
       {/* Controls */}
@@ -662,9 +692,9 @@ export default function SpringStatementCalculator() {
         </div>
 
         <div className="controls-group">
-          <div className="controls-row controls-row-6">
+          <div className="controls-row controls-row-6" style={{ marginBottom: 14 }}>
             <div className="control-item control-span-2">
-              <label>Your income</label>
+              <label>Employment income</label>
               <div className="salary-input-wrapper">
                 <span className="currency-symbol">£</span>
                 <input
@@ -678,7 +708,22 @@ export default function SpringStatementCalculator() {
                 />
               </div>
             </div>
-            <div className="control-item">
+            <div className="control-item control-span-2">
+              <label>Self-employment income</label>
+              <div className="salary-input-wrapper">
+                <span className="currency-symbol">£</span>
+                <input
+                  type="number"
+                  value={draftSelfEmploymentIncome}
+                  onChange={(e) =>
+                    setDraftSelfEmploymentIncome(parseFloat(e.target.value) || 0)
+                  }
+                  min={0}
+                  step={1000}
+                />
+              </div>
+            </div>
+            <div className="control-item control-span-2">
               <label>Your age</label>
               <input
                 type="number"
@@ -691,7 +736,9 @@ export default function SpringStatementCalculator() {
                 className="age-input"
               />
             </div>
-            <div className="control-item">
+          </div>
+          <div className="controls-row controls-row-6">
+            <div className="control-item control-span-2">
               <label>Monthly rent</label>
               <div className="salary-input-wrapper">
                 <span className="currency-symbol">£</span>
@@ -706,7 +753,7 @@ export default function SpringStatementCalculator() {
                 />
               </div>
             </div>
-            <div className="control-item">
+            <div className="control-item control-span-2">
               <label>Children</label>
               <select
                 value={draftChildren}
@@ -719,8 +766,8 @@ export default function SpringStatementCalculator() {
                 ))}
               </select>
             </div>
-            <div className="control-item">
-              <label>Tax year</label>
+            <div className="control-item control-span-2">
+              <label>Fiscal year</label>
               <select
                 value={draftYear}
                 onChange={(e) => setDraftYear(parseInt(e.target.value))}
@@ -735,55 +782,57 @@ export default function SpringStatementCalculator() {
           </div>
 
           {/* Second row: couple + children ages (only if applicable) */}
-          {(draftIsCouple || draftChildren > 0) && (
-            <div className="controls-row controls-row-6 controls-row-secondary">
-              <div className="control-item">
-                <label>Couple</label>
-                <button
-                  type="button"
-                  className={`switch ${draftIsCouple ? "switch-on" : ""}`}
-                  onClick={() => setDraftIsCouple(!draftIsCouple)}
-                  role="switch"
-                  aria-checked={draftIsCouple}
-                >
-                  <span className="switch-thumb" />
-                  <span className="switch-label">{draftIsCouple ? "Yes" : "No"}</span>
-                </button>
-              </div>
-              {draftIsCouple && (
-                <>
-                  <div className="control-item control-span-2">
-                    <label>Partner's income</label>
-                    <div className="salary-input-wrapper">
-                      <span className="currency-symbol">£</span>
-                      <input
-                        type="number"
-                        value={draftPartnerIncome}
-                        onChange={(e) =>
-                          setDraftPartnerIncome(parseFloat(e.target.value) || 0)
-                        }
-                        min={0}
-                        step={1000}
-                      />
-                    </div>
-                  </div>
-                  <div className="control-item">
-                    <label>Partner's age</label>
+          <div className="controls-row controls-row-6 controls-row-secondary">
+            <div className="control-item control-span-2">
+              <label>Couple</label>
+              <button
+                type="button"
+                className={`switch ${draftIsCouple ? "switch-on" : ""}`}
+                onClick={() => setDraftIsCouple(!draftIsCouple)}
+                role="switch"
+                aria-checked={draftIsCouple}
+              >
+                <span className="switch-thumb" />
+                <span className="switch-label">{draftIsCouple ? "Yes" : "No"}</span>
+              </button>
+            </div>
+            {draftIsCouple && (
+              <>
+                <div className="control-item control-span-2">
+                  <label>Partner's income</label>
+                  <div className="salary-input-wrapper">
+                    <span className="currency-symbol">£</span>
                     <input
                       type="number"
-                      value={draftPartnerAge}
+                      value={draftPartnerIncome}
                       onChange={(e) =>
-                        setDraftPartnerAge(parseInt(e.target.value) || 30)
+                        setDraftPartnerIncome(parseFloat(e.target.value) || 0)
                       }
-                      min={16}
-                      max={100}
-                      className="age-input"
+                      min={0}
+                      step={1000}
                     />
                   </div>
-                </>
-              )}
+                </div>
+                <div className="control-item control-span-2">
+                  <label>Partner's age</label>
+                  <input
+                    type="number"
+                    value={draftPartnerAge}
+                    onChange={(e) =>
+                      setDraftPartnerAge(parseInt(e.target.value) || 30)
+                    }
+                    min={16}
+                    max={100}
+                    className="age-input"
+                  />
+                </div>
+              </>
+            )}
+          </div>
+          {draftChildrenAges.length > 0 && (
+            <div className="controls-row controls-row-6 controls-row-secondary">
               {draftChildrenAges.map((age, i) => (
-                <div className="control-item" key={i}>
+                <div className="control-item control-span-2" key={i}>
                   <label>Child {i + 1} age</label>
                   <input
                     type="number"
@@ -802,25 +851,6 @@ export default function SpringStatementCalculator() {
                   />
                 </div>
               ))}
-            </div>
-          )}
-
-          {/* Couple toggle when no children and not yet a couple */}
-          {!draftIsCouple && draftChildren === 0 && (
-            <div className="controls-row controls-row-6 controls-row-secondary">
-              <div className="control-item">
-                <label>Couple</label>
-                <button
-                  type="button"
-                  className={`switch ${draftIsCouple ? "switch-on" : ""}`}
-                  onClick={() => setDraftIsCouple(!draftIsCouple)}
-                  role="switch"
-                  aria-checked={draftIsCouple}
-                >
-                  <span className="switch-thumb" />
-                  <span className="switch-label">{draftIsCouple ? "Yes" : "No"}</span>
-                </button>
-              </div>
             </div>
           )}
         </div>
@@ -846,7 +876,7 @@ export default function SpringStatementCalculator() {
           </button>
           {moreDetailsExpanded && (
             <div style={{ padding: "0 28px 20px" }}>
-              <div className="controls-row controls-row-6" style={{ marginBottom: 14 }}>
+              <div className="controls-row controls-row-6">
                 <div className="control-item control-span-2">
                   <label>Monthly childcare</label>
                   <div className="salary-input-wrapper">
@@ -859,20 +889,6 @@ export default function SpringStatementCalculator() {
                       step={50}
                     />
                   </div>
-                </div>
-                <div className="control-item control-span-2">
-                  <label>Student loan</label>
-                  <select
-                    value={draftStudentLoan}
-                    onChange={(e) => setDraftStudentLoan(e.target.value)}
-                  >
-                    <option value="NO_STUDENT_LOAN">None</option>
-                    <option value="PLAN_1">Plan 1</option>
-                    <option value="PLAN_2">Plan 2</option>
-                    <option value="PLAN_4">Plan 4 (Scotland)</option>
-                    <option value="PLAN_5">Plan 5</option>
-                    <option value="POSTGRADUATE">Postgraduate</option>
-                  </select>
                 </div>
                 <div className="control-item control-span-2">
                   <label>Region</label>
@@ -894,21 +910,6 @@ export default function SpringStatementCalculator() {
                     <option value="NORTHERN_IRELAND">Northern Ireland</option>
                   </select>
                 </div>
-              </div>
-              <div className="controls-row controls-row-6">
-                <div className="control-item control-span-2">
-                  <label>Council tax band</label>
-                  <select
-                    value={draftCouncilTaxBand}
-                    onChange={(e) => setDraftCouncilTaxBand(e.target.value)}
-                  >
-                    {["A", "B", "C", "D", "E", "F", "G", "H"].map((band) => (
-                      <option key={band} value={band}>
-                        Band {band}
-                      </option>
-                    ))}
-                  </select>
-                </div>
                 <div className="control-item control-span-2">
                   <label>Tenure type</label>
                   <select
@@ -923,6 +924,139 @@ export default function SpringStatementCalculator() {
                   </select>
                 </div>
               </div>
+            </div>
+          )}
+        </div>
+
+        {/* Collapsible student loan details section */}
+        <div className="controls-group controls-group-expandable">
+          <button
+            className="cpi-expand-button"
+            onClick={() => setStudentLoanExpanded(!studentLoanExpanded)}
+          >
+            <div className="controls-group-label">Student loan details</div>
+            <span className={`expand-chevron ${studentLoanExpanded ? "expanded" : ""}`}>
+              <svg width="12" height="12" viewBox="0 0 12 12">
+                <path
+                  d="M3 4.5L6 7.5L9 4.5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </span>
+          </button>
+          {studentLoanExpanded && (
+            <div style={{ padding: "0 28px 20px" }}>
+              <div className="controls-row controls-row-6" style={{ marginBottom: 14 }}>
+                <div className="control-item control-span-2">
+                  <label>Repayment plan</label>
+                  <select
+                    value={draftStudentLoan}
+                    onChange={(e) => setDraftStudentLoan(e.target.value)}
+                  >
+                    {STUDENT_LOAN_PLANS.map((plan) => (
+                      <option key={plan.value} value={plan.value}>
+                        {plan.label}
+                      </option>
+                    ))}
+                  </select>
+                  {draftStudentLoan !== "NO_STUDENT_LOAN" && (
+                    <div className="control-hint">
+                      {STUDENT_LOAN_PLANS.find((p) => p.value === draftStudentLoan)?.description}
+                    </div>
+                  )}
+                </div>
+                <div className="control-item control-span-2">
+                  <div className="label-with-info">
+                    <label>Postgraduate loan</label>
+                    <span className="info-icon-wrapper">
+                      <span className="info-icon">?</span>
+                      <span className="info-tooltip">Adds 6% repayment above £21,000 threshold</span>
+                    </span>
+                  </div>
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={draftHasPostgrad}
+                      onChange={(e) => setDraftHasPostgrad(e.target.checked)}
+                    />
+                    <span>{draftHasPostgrad ? "Yes" : "No"}</span>
+                  </label>
+                </div>
+                <div className="control-item control-span-2">
+                  <div className="label-with-info">
+                    <label>Loan balance</label>
+                    <span className="info-icon-wrapper">
+                      <span className="info-icon">?</span>
+                      <span className="info-tooltip">Outstanding student loan balance</span>
+                    </span>
+                  </div>
+                  <div className="salary-input-wrapper">
+                    <span className="currency-symbol">£</span>
+                    <input
+                      type="number"
+                      value={draftLoanBalance}
+                      onChange={(e) => setDraftLoanBalance(parseFloat(e.target.value) || 0)}
+                      min={0}
+                      max={500000}
+                      step={1000}
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="controls-row controls-row-6">
+                <div className="control-item control-span-2">
+                  <div className="label-with-info">
+                    <label>Salary growth</label>
+                    <span className="info-icon-wrapper">
+                      <span className="info-icon">?</span>
+                      <span className="info-tooltip">Used for multi-year projections</span>
+                    </span>
+                  </div>
+                  <select
+                    value={draftSalaryGrowthRate}
+                    onChange={(e) => setDraftSalaryGrowthRate(parseFloat(e.target.value))}
+                  >
+                    {[0, 1, 2, 3, 4, 5, 6, 7].map((pct) => (
+                      <option key={pct} value={pct / 100}>
+                        {pct}%
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="control-item control-span-2">
+                  <div className="label-with-info">
+                    <label>Interest rate</label>
+                    <span className="info-icon-wrapper">
+                      <span className="info-icon">?</span>
+                      <span className="info-tooltip">Annual interest rate on student loan</span>
+                    </span>
+                  </div>
+                  <select
+                    value={draftInterestRate}
+                    onChange={(e) => setDraftInterestRate(parseFloat(e.target.value))}
+                  >
+                    {[0, 1, 2, 3, 4, 5, 6, 7].map((pct) => (
+                      <option key={pct} value={pct / 100}>
+                        {pct}%
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              {draftStudentLoan !== "NO_STUDENT_LOAN" && draftHasPostgrad && (
+                <div className="student-loan-limitation-note">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M8 1L1 14h14L8 1z" stroke="#d97706" strokeWidth="1.5" fill="none" />
+                    <path d="M8 6v3M8 11v1" stroke="#d97706" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                  <span>
+                    PolicyEngine currently models only one loan plan at a time. Your undergrad plan ({STUDENT_LOAN_PLANS.find((p) => p.value === draftStudentLoan)?.label}) will be used for the calculation. Postgrad repayment is not added separately.
+                  </span>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1082,7 +1216,7 @@ export default function SpringStatementCalculator() {
             <section className="narrative-section">
               <h2>Impact over time</h2>
               <p>
-                Net household income impact for each tax year as OBR forecasts
+                Net household income impact for each fiscal year as OBR forecasts
                 diverge before and after the Spring Statement.
               </p>
               {multiYearLoading ? (

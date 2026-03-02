@@ -42,6 +42,9 @@ class SpringStatementInput(BaseModel):
     employment_income: float = Field(
         default=30000, ge=0, description="Annual employment income (GBP)"
     )
+    self_employment_income: float = Field(
+        default=0, ge=0, description="Annual self-employment income (GBP)"
+    )
     num_children: int = Field(
         default=0, ge=0, le=6, description="Number of dependent children"
     )
@@ -78,8 +81,20 @@ class SpringStatementInput(BaseModel):
     student_loan_plan: str = Field(
         default="NO_STUDENT_LOAN", description="Student loan plan type"
     )
+    has_postgrad_loan: bool = Field(
+        default=False, description="Whether the person has a postgraduate loan"
+    )
+    salary_growth_rate: float = Field(
+        default=0.0, ge=0.0, le=0.10, description="Annual salary growth rate for multi-year projections"
+    )
+    loan_balance: float = Field(
+        default=0, ge=0, le=500000, description="Outstanding student loan balance (GBP)"
+    )
+    interest_rate: float = Field(
+        default=0.0, ge=0.0, le=0.15, description="Annual interest rate on student loan"
+    )
     year: int = Field(
-        default=2026, ge=2025, le=2030, description="Tax year"
+        default=2026, ge=2025, le=2030, description="Fiscal year"
     )
 
 
@@ -93,6 +108,7 @@ async def spring_statement(data: SpringStatementInput):
             executor,
             lambda: calculate_household_impact(
                 employment_income=data.employment_income,
+                self_employment_income=data.self_employment_income,
                 num_children=data.num_children,
                 monthly_rent=data.monthly_rent,
                 is_couple=data.is_couple,
@@ -126,6 +142,7 @@ async def spring_statement_multi_year(data: SpringStatementInput):
             executor,
             lambda: calculate_multi_year_net_impact(
                 employment_income=data.employment_income,
+                self_employment_income=data.self_employment_income,
                 num_children=data.num_children,
                 monthly_rent=data.monthly_rent,
                 is_couple=data.is_couple,
@@ -138,6 +155,7 @@ async def spring_statement_multi_year(data: SpringStatementInput):
                 tenure_type=data.tenure_type,
                 childcare_expenses=data.childcare_expenses,
                 student_loan_plan=data.student_loan_plan,
+                salary_growth_rate=data.salary_growth_rate,
             ),
         )
         return result

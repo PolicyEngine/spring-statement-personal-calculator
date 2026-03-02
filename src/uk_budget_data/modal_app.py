@@ -74,6 +74,7 @@ def fastapi_app():
 
     class SpringStatementInput(BaseModel):
         employment_income: float = Field(default=30000, ge=0)
+        self_employment_income: float = Field(default=0, ge=0)
         num_children: int = Field(default=0, ge=0, le=6)
         monthly_rent: float = Field(default=800, ge=0, le=5000)
         is_couple: bool = Field(default=False)
@@ -86,6 +87,10 @@ def fastapi_app():
         tenure_type: str = Field(default="RENT_PRIVATELY")
         childcare_expenses: float = Field(default=0, ge=0, le=5000)
         student_loan_plan: str = Field(default="NO_STUDENT_LOAN")
+        has_postgrad_loan: bool = Field(default=False)
+        salary_growth_rate: float = Field(default=0.0, ge=0.0, le=0.10)
+        loan_balance: float = Field(default=0, ge=0, le=500000)
+        interest_rate: float = Field(default=0.0, ge=0.0, le=0.15)
         year: int = Field(default=2026, ge=2025, le=2030)
 
     @api.get("/")
@@ -105,6 +110,7 @@ def fastapi_app():
                 executor,
                 lambda: calculate_household_impact(
                     employment_income=data.employment_income,
+                    self_employment_income=data.self_employment_income,
                     num_children=data.num_children,
                     monthly_rent=data.monthly_rent,
                     is_couple=data.is_couple,
@@ -136,6 +142,7 @@ def fastapi_app():
                 executor,
                 lambda: calculate_multi_year_net_impact(
                     employment_income=data.employment_income,
+                    self_employment_income=data.self_employment_income,
                     num_children=data.num_children,
                     monthly_rent=data.monthly_rent,
                     is_couple=data.is_couple,
@@ -148,6 +155,7 @@ def fastapi_app():
                     tenure_type=data.tenure_type,
                     childcare_expenses=data.childcare_expenses,
                     student_loan_plan=data.student_loan_plan,
+                    salary_growth_rate=data.salary_growth_rate,
                 ),
             )
             return result

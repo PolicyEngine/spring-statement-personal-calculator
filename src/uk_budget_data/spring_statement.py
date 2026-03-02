@@ -34,7 +34,6 @@ HOUSEHOLD_VARS = "household"
 # Ordered group definitions for display.
 PROGRAM_GROUPS = [
     {"id": "direct_taxes", "label": "Direct Taxes"},
-    {"id": "indirect_taxes", "label": "Indirect Taxes"},
     {"id": "property_local_taxes", "label": "Property & Local Taxes"},
     {"id": "other_deductions", "label": "Other Deductions"},
     {"id": "core_benefits", "label": "Core Benefits"},
@@ -79,21 +78,6 @@ PROGRAM_STRUCTURE = [
         "entity": PERSON_VARS,
         "is_tax": True,
         "group": "direct_taxes",
-    },
-    # ── INDIRECT TAXES ───────────────────────────────────────────────────
-    {
-        "id": "vat",
-        "label": "Value Added Tax (VAT)",
-        "entity": HOUSEHOLD_VARS,
-        "is_tax": True,
-        "group": "indirect_taxes",
-    },
-    {
-        "id": "fuel_duty",
-        "label": "Fuel Duty",
-        "entity": HOUSEHOLD_VARS,
-        "is_tax": True,
-        "group": "indirect_taxes",
     },
     # ── PROPERTY & LOCAL TAXES ───────────────────────────────────────────
     {
@@ -388,6 +372,7 @@ def _build_situation(
     tenure_type: str = "RENT_PRIVATELY",
     childcare_expenses: float = 0,
     student_loan_plan: str = "NO_STUDENT_LOAN",
+    self_employment_income: float = 0,
 ) -> dict:
     """Build a PolicyEngine household situation dict."""
     people = {
@@ -396,6 +381,9 @@ def _build_situation(
             "employment_income": {year: employment_income},
         }
     }
+
+    if self_employment_income > 0:
+        people["adult"]["self_employment_income"] = {year: self_employment_income}
     members = ["adult"]
 
     if student_loan_plan != "NO_STUDENT_LOAN":
@@ -507,6 +495,7 @@ def calculate_household_impact(
     tenure_type: str = "RENT_PRIVATELY",
     childcare_expenses: float = 0,
     student_loan_plan: str = "NO_STUDENT_LOAN",
+    self_employment_income: float = 0,
     spring_cpi: dict = None,
 ) -> dict:
     """Calculate the impact of Spring Statement policy changes on a household.
@@ -532,6 +521,7 @@ def calculate_household_impact(
         tenure_type=tenure_type,
         childcare_expenses=childcare_expenses,
         student_loan_plan=student_loan_plan,
+        self_employment_income=self_employment_income,
     )
 
     # Baseline simulation — PolicyEngine defaults reflect Autumn Budget parameters
@@ -608,7 +598,9 @@ def calculate_multi_year_net_impact(
     tenure_type: str = "RENT_PRIVATELY",
     childcare_expenses: float = 0,
     student_loan_plan: str = "NO_STUDENT_LOAN",
+    self_employment_income: float = 0,
     spring_cpi: dict = None,
+    salary_growth_rate: float = 0.0,
 ) -> dict:
     """Calculate net household income impact for each year 2026-2030.
 
@@ -632,12 +624,18 @@ def calculate_multi_year_net_impact(
     ]
 
     for year in range(2026, 2031):
+        growth_factor = (1 + salary_growth_rate) ** (year - 2026)
+        grown_income = employment_income * growth_factor
+        grown_partner_income = partner_income * growth_factor if is_couple else partner_income
+
+        grown_se_income = self_employment_income * growth_factor
+
         situation = _build_situation(
-            employment_income=employment_income,
+            employment_income=grown_income,
             num_children=num_children,
             monthly_rent=monthly_rent,
             is_couple=is_couple,
-            partner_income=partner_income,
+            partner_income=grown_partner_income,
             year=year,
             adult_age=adult_age,
             partner_age=partner_age,
@@ -647,6 +645,7 @@ def calculate_multi_year_net_impact(
             tenure_type=tenure_type,
             childcare_expenses=childcare_expenses,
             student_loan_plan=student_loan_plan,
+            self_employment_income=grown_se_income,
         )
 
         num_people = len(situation["people"])
