@@ -692,3 +692,165 @@ def calculate_multi_year_net_impact(
         yearly_breakdown[str(year)] = breakdown
 
     return {"yearly_impact": yearly_impact, "yearly_breakdown": yearly_breakdown}
+
+
+# ---------------------------------------------------------------------------
+# Marginal Tax Rate data across income range
+# ---------------------------------------------------------------------------
+
+# Variables to extract for MTR component breakdown
+_MTR_TAX_VARS = [
+    ("income_tax", PERSON_VARS),
+    ("national_insurance", PERSON_VARS),
+]
+
+_MTR_BENEFIT_VARS = [
+    ("universal_credit", BENUNIT_VARS),
+    ("child_benefit", BENUNIT_VARS),
+    ("housing_benefit", BENUNIT_VARS),
+    ("working_tax_credit", BENUNIT_VARS),
+    ("child_tax_credit", BENUNIT_VARS),
+    ("pension_credit", BENUNIT_VARS),
+]
+
+
+def calculate_mtr_data(
+    num_children: int,
+    monthly_rent: float,
+    is_couple: bool,
+    partner_income: float,
+    year: int = 2026,
+    adult_age: int = 30,
+    partner_age: int = 30,
+    children_ages: list = None,
+    region: str = "LONDON",
+    council_tax_band: str = "D",
+    tenure_type: str = "RENT_PRIVATELY",
+    childcare_expenses: float = 0,
+    student_loan_plan: str = "NO_STUDENT_LOAN",
+    spring_cpi: dict = None,
+) -> dict:
+    """Calculate marginal tax rates across an income range for baseline and reform.
+
+    Uses PolicyEngine's axes feature to evaluate all income points in a single
+    vectorised simulation per scenario (2 sims total instead of N×2).
+    """
+    import numpy as np
+
+    reform_cpi = spring_cpi if spring_cpi is not None else SPRING_CPI
+    num_points = 50
+
+    parameter_changes = {
+        CPI_PARAMETER: {f"{yr}-01-01": rate for yr, rate in reform_cpi.items()}
+    }
+
+    # Build the situation with axes (varies employment_income for the adult)
+    people = {
+        "adult": {
+            "age": {year: adult_age},
+            "employment_income": {year: 0},  # placeholder; axes overrides
+        }
+    }
+    members = ["adult"]
+
+    if student_loan_plan != "NO_STUDENT_LOAN":
+        people["adult"]["student_loan_plan"] = {year: student_loan_plan}
+
+    if is_couple:
+        people["partner"] = {
+            "age": {year: partner_age},
+            "employment_income": {year: partner_income},
+        }
+        members.append("partner")
+
+    if children_ages is None:
+        children_ages_list = [5 + i * 2 for i in range(num_children)]
+    else:
+        children_ages_list = list(children_ages)
+    for i in range(num_children):
+        cid = f"child_{i + 1}"
+        age = children_ages_list[i] if i < len(children_ages_list) else 5 + i * 2
+        people[cid] = {"age": {year: age}}
+        members.append(cid)
+
+    situation = {
+        "people": people,
+        "benunits": {"benunit": {"members": members}},
+        "households": {
+            "household": {
+                "members": members,
+                "region": {year: region},
+                "council_tax_band": {year: council_tax_band},
+                "tenure_type": {year: tenure_type},
+            }
+        },
+        "axes": [
+            [
+                {
+                    "name": "employment_income",
+                    "min": 0,
+                    "max": 150_000,
+                    "count": num_points,
+                    "period": str(year),
+                }
+            ]
+        ],
+    }
+
+    if monthly_rent > 0:
+        situation["households"]["household"]["rent"] = {year: monthly_rent * 12}
+    if num_children > 0 or monthly_rent > 0:
+        situation["benunits"]["benunit"]["would_claim_uc"] = {year: True}
+    if childcare_expenses > 0:
+        first_child = next((m for m in members if m.startswith("child_")), None)
+        if first_child:
+            people[first_child]["childcare_expenses"] = {year: childcare_expenses * 12}
+
+    num_people = len(people)
+
+    def _run_scenario(use_reform: bool) -> list[dict]:
+        if use_reform:
+            scenario = Scenario(parameter_changes=parameter_changes)
+            sim = Simulation(situation=situation, scenario=scenario)
+        else:
+            sim = Simulation(situation=situation)
+
+        # Person-level vars: reshape to (num_points, num_people) and sum
+        income_tax = sim.calculate("income_tax", year).reshape(-1, num_people).sum(axis=1)
+        ni = sim.calculate("national_insurance", year).reshape(-1, num_people).sum(axis=1)
+        employment_income = sim.calculate("employment_income", year).reshape(-1, num_people)[:, 0]
+
+        # Benunit / household level vars: one value per point
+        uc = sim.calculate("universal_credit", year)
+        cb = sim.calculate("child_benefit", year)
+        hb = sim.calculate("housing_benefit", year)
+        wtc = sim.calculate("working_tax_credit", year)
+        ctc = sim.calculate("child_tax_credit", year)
+        pc = sim.calculate("pension_credit", year)
+        benefits = uc + cb + hb + wtc + ctc + pc
+
+        net_income = sim.calculate("household_net_income", year)
+
+        # Compute marginal rates via np.gradient
+        delta = float(employment_income[1] - employment_income[0]) if len(employment_income) > 1 else 1000
+        it_marginal = np.clip(np.gradient(income_tax, delta), 0, 1)
+        ni_marginal = np.clip(np.gradient(ni, delta), 0, 1)
+        ben_marginal = np.clip(-np.gradient(benefits, delta), 0, 1)
+        total_marginal = np.clip(1 - np.gradient(net_income, delta), 0, 1)
+
+        mtr_data = []
+        for j in range(len(employment_income)):
+            mtr_data.append({
+                "income": round(float(employment_income[j])),
+                "income_tax": round(float(it_marginal[j]), 4),
+                "national_insurance": round(float(ni_marginal[j]), 4),
+                "benefits_taper": round(float(ben_marginal[j]), 4),
+                "total": round(float(total_marginal[j]), 4),
+            })
+
+        return mtr_data
+
+    baseline = _run_scenario(False)
+    reform = _run_scenario(True)
+
+    return {"baseline": baseline, "reform": reform}

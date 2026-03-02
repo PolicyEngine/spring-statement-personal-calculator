@@ -852,6 +852,46 @@ html {
   font-size: 0.95rem;
 }
 
+/* MTR chart */
+.mtr-chart {
+  min-height: 380px;
+}
+
+.mtr-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 12px;
+  font-size: 0.82rem;
+  color: #475569;
+}
+
+.mtr-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mtr-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
+.mtr-swatch-line {
+  background: none;
+  border-bottom: 2.5px dashed;
+  height: 0;
+  width: 18px;
+  border-radius: 0;
+}
+
+.mtr-tooltip {
+  min-width: 180px;
+}
+
 /* Footer / Methodology */
 .narrative-footer {
   margin-top: 48px;

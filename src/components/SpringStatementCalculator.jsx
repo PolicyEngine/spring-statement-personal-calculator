@@ -14,6 +14,14 @@ const COLORS = {
   border: "#e2e8f0",
 };
 
+const MTR_COLORS = {
+  incomeTax: "#14B8A6",
+  ni: "#5EEAD4",
+  benefitsTaper: "#F59E0B",
+  baselineLine: "#9CA3AF",
+  reformLine: "#344054",
+};
+
 
 function formatCurrency(value) {
   const absVal = Math.abs(value);
@@ -94,14 +102,21 @@ export default function SpringStatementCalculator() {
   const [multiYearData, setMultiYearData] = useState(null);
   const [multiYearLoading, setMultiYearLoading] = useState(false);
 
-  // Chart ref
+  // MTR state
+  const [mtrData, setMtrData] = useState(null);
+  const [mtrLoading, setMtrLoading] = useState(false);
+
+  // Chart refs
   const multiYearChartRef = useRef(null);
+  const mtrChartRef = useRef(null);
 
   const handleCalculate = useCallback(async () => {
     setLoading(true);
     setError(null);
     setMultiYearData(null);
     setMultiYearLoading(true);
+    setMtrData(null);
+    setMtrLoading(true);
 
     const requestBody = {
       employment_income: draftIncome,
@@ -128,6 +143,12 @@ export default function SpringStatementCalculator() {
     });
 
     const multiYearPromise = fetch(`${API_URL}/spring-statement/multi-year`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(requestBody),
+    });
+
+    const mtrPromise = fetch(`${API_URL}/spring-statement/mtr`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(requestBody),
@@ -165,18 +186,18 @@ export default function SpringStatementCalculator() {
       setLoading(false);
     }
 
-    // Handle multi-year request independently
-    try {
-      const multiYearResponse = await multiYearPromise;
-      if (multiYearResponse.ok) {
-        const multiYearResult = await multiYearResponse.json();
-        setMultiYearData(multiYearResult);
-      }
-    } catch {
-      // Multi-year failure is non-critical; silently ignore
-    } finally {
-      setMultiYearLoading(false);
-    }
+    // Handle multi-year and MTR requests independently
+    multiYearPromise
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setMultiYearData(d))
+      .catch(() => {})
+      .finally(() => setMultiYearLoading(false));
+
+    mtrPromise
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setMtrData(d))
+      .catch(() => {})
+      .finally(() => setMtrLoading(false));
   }, [
     draftIncome,
     draftChildren,
@@ -371,6 +392,237 @@ export default function SpringStatementCalculator() {
       .attr("fill", "#475569");
   }, [multiYearChartData]);
 
+  // D3 MTR stacked area chart
+  useEffect(() => {
+    if (!mtrChartRef.current || !mtrData?.reform?.length) return;
+
+    const container = mtrChartRef.current;
+    d3.select(container).selectAll("*").remove();
+
+    const margin = { top: 20, right: 30, bottom: 50, left: 60 };
+    const containerWidth = container.clientWidth;
+    const width = containerWidth - margin.left - margin.right;
+    const height = 360 - margin.top - margin.bottom;
+
+    const svg = d3
+      .select(container)
+      .append("svg")
+      .attr("width", containerWidth)
+      .attr("height", height + margin.top + margin.bottom);
+
+    const g = svg
+      .append("g")
+      .attr("transform", `translate(${margin.left},${margin.top})`);
+
+    const reformData = mtrData.reform;
+    const baselineData = mtrData.baseline;
+
+    const x = d3
+      .scaleLinear()
+      .domain([0, d3.max(reformData, (d) => d.income)])
+      .range([0, width]);
+
+    const y = d3.scaleLinear().domain([0, 100]).range([height, 0]);
+
+    // Grid
+    g.append("g")
+      .attr("class", "grid")
+      .call(d3.axisLeft(y).tickSize(-width).tickFormat("").ticks(10));
+
+    // Stacked areas for reform scenario
+    // Layer 1: Income Tax
+    const areaIT = d3
+      .area()
+      .x((d) => x(d.income))
+      .y0(y(0))
+      .y1((d) => y(d.income_tax * 100))
+      .curve(d3.curveStepAfter);
+
+    g.append("path")
+      .datum(reformData)
+      .attr("fill", MTR_COLORS.incomeTax)
+      .attr("fill-opacity", 0.7)
+      .attr("d", areaIT);
+
+    // Layer 2: NI (stacked on top of income tax)
+    const areaNI = d3
+      .area()
+      .x((d) => x(d.income))
+      .y0((d) => y(d.income_tax * 100))
+      .y1((d) => y((d.income_tax + d.national_insurance) * 100))
+      .curve(d3.curveStepAfter);
+
+    g.append("path")
+      .datum(reformData)
+      .attr("fill", MTR_COLORS.ni)
+      .attr("fill-opacity", 0.7)
+      .attr("d", areaNI);
+
+    // Layer 3: Benefits taper (stacked on top of NI)
+    const areaBen = d3
+      .area()
+      .x((d) => x(d.income))
+      .y0((d) => y((d.income_tax + d.national_insurance) * 100))
+      .y1((d) =>
+        y(
+          (d.income_tax + d.national_insurance + d.benefits_taper) * 100
+        )
+      )
+      .curve(d3.curveStepAfter);
+
+    g.append("path")
+      .datum(reformData)
+      .attr("fill", MTR_COLORS.benefitsTaper)
+      .attr("fill-opacity", 0.7)
+      .attr("d", areaBen);
+
+    // Reform total line (solid)
+    const reformLine = d3
+      .line()
+      .x((d) => x(d.income))
+      .y((d) => y(d.total * 100))
+      .curve(d3.curveStepAfter);
+
+    g.append("path")
+      .datum(reformData)
+      .attr("fill", "none")
+      .attr("stroke", MTR_COLORS.reformLine)
+      .attr("stroke-width", 1.5)
+      .attr("d", reformLine);
+
+    // Baseline total line (dashed)
+    const baselineLine = d3
+      .line()
+      .x((d) => x(d.income))
+      .y((d) => y(d.total * 100))
+      .curve(d3.curveStepAfter);
+
+    g.append("path")
+      .datum(baselineData)
+      .attr("fill", "none")
+      .attr("stroke", MTR_COLORS.baselineLine)
+      .attr("stroke-width", 1.5)
+      .attr("stroke-dasharray", "6,3")
+      .attr("d", baselineLine);
+
+    // Highlight user's income
+    if (draftIncome > 0 && draftIncome <= d3.max(reformData, (d) => d.income)) {
+      const closest = reformData.reduce((prev, curr) =>
+        Math.abs(curr.income - draftIncome) < Math.abs(prev.income - draftIncome)
+          ? curr
+          : prev
+      );
+      const closestBaseline = baselineData.reduce((prev, curr) =>
+        Math.abs(curr.income - draftIncome) < Math.abs(prev.income - draftIncome)
+          ? curr
+          : prev
+      );
+
+      g.append("line")
+        .attr("x1", x(draftIncome))
+        .attr("x2", x(draftIncome))
+        .attr("y1", 0)
+        .attr("y2", height)
+        .attr("stroke", COLORS.teal)
+        .attr("stroke-width", 1.5)
+        .attr("stroke-dasharray", "4,2");
+
+      // Reform dot
+      g.append("circle")
+        .attr("cx", x(draftIncome))
+        .attr("cy", y(closest.total * 100))
+        .attr("r", 5)
+        .attr("fill", MTR_COLORS.reformLine)
+        .attr("stroke", "#fff")
+        .attr("stroke-width", 2);
+
+      // Baseline dot
+      g.append("circle")
+        .attr("cx", x(draftIncome))
+        .attr("cy", y(closestBaseline.total * 100))
+        .attr("r", 5)
+        .attr("fill", MTR_COLORS.baselineLine)
+        .attr("stroke", "#fff")
+        .attr("stroke-width", 2);
+
+      // Label
+      g.append("text")
+        .attr("x", x(draftIncome) + 8)
+        .attr("y", 14)
+        .attr("font-size", "11px")
+        .attr("font-weight", "600")
+        .attr("fill", COLORS.teal)
+        .text(`Your income`);
+    }
+
+    // X axis
+    g.append("g")
+      .attr("class", "axis")
+      .attr("transform", `translate(0,${height})`)
+      .call(d3.axisBottom(x).tickFormat((d) => `£${d / 1000}k`).ticks(8));
+
+    g.append("text")
+      .attr("x", width / 2)
+      .attr("y", height + 40)
+      .attr("text-anchor", "middle")
+      .attr("font-size", "12px")
+      .attr("fill", "#64748B")
+      .text("Employment income");
+
+    // Y axis
+    g.append("g")
+      .attr("class", "axis")
+      .call(d3.axisLeft(y).tickFormat((d) => `${d}%`).ticks(10));
+
+    // Tooltip
+    const tooltip = d3
+      .select(container)
+      .append("div")
+      .attr("class", "bar-tooltip mtr-tooltip");
+
+    const bisect = d3.bisector((d) => d.income).left;
+
+    g.append("rect")
+      .attr("width", width)
+      .attr("height", height)
+      .attr("fill", "none")
+      .attr("pointer-events", "all")
+      .on("mousemove", function (event) {
+        const [mx] = d3.pointer(event);
+        const income = x.invert(mx);
+        const i = Math.min(bisect(reformData, income, 1), reformData.length - 1);
+        const d = reformData[i];
+        const b = baselineData[Math.min(i, baselineData.length - 1)];
+
+        const reformTotal = (d.total * 100).toFixed(0);
+        const baselineTotal = (b.total * 100).toFixed(0);
+
+        const rows = [
+          { label: "Income tax", color: MTR_COLORS.incomeTax, val: d.income_tax },
+          { label: "National insurance", color: MTR_COLORS.ni, val: d.national_insurance },
+          { label: "Benefits taper", color: MTR_COLORS.benefitsTaper, val: d.benefits_taper },
+        ]
+          .filter((r) => r.val > 0.005)
+          .map(
+            (r) =>
+              `<div class="tooltip-breakdown-row"><span style="color:${r.color}">● ${r.label}</span><span style="font-weight:600">${(r.val * 100).toFixed(0)}%</span></div>`
+          )
+          .join("");
+
+        tooltip
+          .style("opacity", 1)
+          .style("left", event.clientX + 15 + "px")
+          .style("top", event.clientY - 10 + "px")
+          .html(
+            `<div class="tooltip-label">£${d3.format(",.0f")(d.income)} income</div>` +
+              `<div class="tooltip-breakdown">${rows}</div>` +
+              `<div class="tooltip-breakdown-row" style="margin-top:6px;padding-top:6px;border-top:1px solid #e2e8f0"><span style="font-weight:600">Spring forecast</span><span style="font-weight:700">${reformTotal}%</span></div>` +
+              `<div class="tooltip-breakdown-row"><span style="color:${MTR_COLORS.baselineLine}">Autumn baseline</span><span style="font-weight:600;color:${MTR_COLORS.baselineLine}">${baselineTotal}%</span></div>`
+          );
+      })
+      .on("mouseout", () => tooltip.style("opacity", 0));
+  }, [mtrData, draftIncome]);
+
   const netImpact = result?.impact?.household_net_income || 0;
 
   return (
@@ -398,7 +650,7 @@ export default function SpringStatementCalculator() {
       {/* Controls */}
       <div className="controls-panel">
         <div className="controls-panel-header">
-          <h2 className="controls-panel-title">Your Household</h2>
+          <h2 className="controls-panel-title">Your household</h2>
           <button
             className="calculate-button"
             onClick={handleCalculate}
@@ -412,7 +664,7 @@ export default function SpringStatementCalculator() {
         <div className="controls-group">
           <div className="controls-row controls-row-6">
             <div className="control-item control-span-2">
-              <label>Your Income</label>
+              <label>Your income</label>
               <div className="salary-input-wrapper">
                 <span className="currency-symbol">£</span>
                 <input
@@ -427,7 +679,7 @@ export default function SpringStatementCalculator() {
               </div>
             </div>
             <div className="control-item">
-              <label>Your Age</label>
+              <label>Your age</label>
               <input
                 type="number"
                 value={draftAdultAge}
@@ -440,7 +692,7 @@ export default function SpringStatementCalculator() {
               />
             </div>
             <div className="control-item">
-              <label>Monthly Rent</label>
+              <label>Monthly rent</label>
               <div className="salary-input-wrapper">
                 <span className="currency-symbol">£</span>
                 <input
@@ -468,7 +720,7 @@ export default function SpringStatementCalculator() {
               </select>
             </div>
             <div className="control-item">
-              <label>Tax Year</label>
+              <label>Tax year</label>
               <select
                 value={draftYear}
                 onChange={(e) => setDraftYear(parseInt(e.target.value))}
@@ -501,7 +753,7 @@ export default function SpringStatementCalculator() {
               {draftIsCouple && (
                 <>
                   <div className="control-item control-span-2">
-                    <label>Partner's Income</label>
+                    <label>Partner's income</label>
                     <div className="salary-input-wrapper">
                       <span className="currency-symbol">£</span>
                       <input
@@ -516,7 +768,7 @@ export default function SpringStatementCalculator() {
                     </div>
                   </div>
                   <div className="control-item">
-                    <label>Partner's Age</label>
+                    <label>Partner's age</label>
                     <input
                       type="number"
                       value={draftPartnerAge}
@@ -532,7 +784,7 @@ export default function SpringStatementCalculator() {
               )}
               {draftChildrenAges.map((age, i) => (
                 <div className="control-item" key={i}>
-                  <label>Child {i + 1} Age</label>
+                  <label>Child {i + 1} age</label>
                   <input
                     type="number"
                     value={age}
@@ -579,7 +831,7 @@ export default function SpringStatementCalculator() {
             className="cpi-expand-button"
             onClick={() => setMoreDetailsExpanded(!moreDetailsExpanded)}
           >
-            <div className="controls-group-label">More Household Details</div>
+            <div className="controls-group-label">More household details</div>
             <span className={`expand-chevron ${moreDetailsExpanded ? "expanded" : ""}`}>
               <svg width="12" height="12" viewBox="0 0 12 12">
                 <path
@@ -596,7 +848,7 @@ export default function SpringStatementCalculator() {
             <div style={{ padding: "0 28px 20px" }}>
               <div className="controls-row controls-row-6" style={{ marginBottom: 14 }}>
                 <div className="control-item control-span-2">
-                  <label>Monthly Childcare</label>
+                  <label>Monthly childcare</label>
                   <div className="salary-input-wrapper">
                     <span className="currency-symbol">£</span>
                     <input
@@ -609,7 +861,7 @@ export default function SpringStatementCalculator() {
                   </div>
                 </div>
                 <div className="control-item control-span-2">
-                  <label>Student Loan</label>
+                  <label>Student loan</label>
                   <select
                     value={draftStudentLoan}
                     onChange={(e) => setDraftStudentLoan(e.target.value)}
@@ -645,7 +897,7 @@ export default function SpringStatementCalculator() {
               </div>
               <div className="controls-row controls-row-6">
                 <div className="control-item control-span-2">
-                  <label>Council Tax Band</label>
+                  <label>Council tax band</label>
                   <select
                     value={draftCouncilTaxBand}
                     onChange={(e) => setDraftCouncilTaxBand(e.target.value)}
@@ -658,7 +910,7 @@ export default function SpringStatementCalculator() {
                   </select>
                 </div>
                 <div className="control-item control-span-2">
-                  <label>Tenure Type</label>
+                  <label>Tenure type</label>
                   <select
                     value={draftTenureType}
                     onChange={(e) => setDraftTenureType(e.target.value)}
@@ -709,14 +961,14 @@ export default function SpringStatementCalculator() {
 
           {/* Impact Table */}
           <section className="narrative-section">
-            <h2>Breakdown by Program</h2>
+            <h2>Breakdown by program</h2>
             <div className="impact-table-container">
               <table className="impact-table">
                 <thead>
                   <tr>
                     <th>Program</th>
-                    <th>Autumn Baseline</th>
-                    <th>Spring Forecast</th>
+                    <th>Autumn baseline</th>
+                    <th>Spring forecast</th>
                     <th>Change</th>
                   </tr>
                 </thead>
@@ -809,7 +1061,7 @@ export default function SpringStatementCalculator() {
                     );
                   })}
                   <tr className="total-row">
-                    <td>Net Household Income</td>
+                    <td>Net household income</td>
                     <td>
                       £{(result.baseline.household_net_income || 0).toLocaleString("en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                     </td>
@@ -828,7 +1080,7 @@ export default function SpringStatementCalculator() {
           {/* Multi-Year Impact Chart */}
           {(multiYearLoading || multiYearChartData.length > 0) && (
             <section className="narrative-section">
-              <h2>Impact Over Time</h2>
+              <h2>Impact over time</h2>
               <p>
                 Net household income impact for each tax year as CPI forecasts
                 diverge between the Autumn Budget and Spring Statement.
@@ -839,6 +1091,43 @@ export default function SpringStatementCalculator() {
                 </div>
               ) : (
                 <div className="impact-bar-chart multi-year-chart" ref={multiYearChartRef} />
+              )}
+            </section>
+          )}
+
+          {/* MTR Chart */}
+          {(mtrLoading || mtrData?.reform?.length > 0) && (
+            <section className="narrative-section">
+              <h2>Marginal tax rates</h2>
+              <p>
+                How each additional pound of income is taxed. The coloured areas
+                show the Spring Statement rates; the dashed line shows the
+                Autumn Budget baseline.
+              </p>
+              <div className="mtr-legend">
+                <span className="mtr-legend-item">
+                  <span className="mtr-swatch" style={{ background: MTR_COLORS.incomeTax }} />
+                  Income tax
+                </span>
+                <span className="mtr-legend-item">
+                  <span className="mtr-swatch" style={{ background: MTR_COLORS.ni }} />
+                  National insurance
+                </span>
+                <span className="mtr-legend-item">
+                  <span className="mtr-swatch" style={{ background: MTR_COLORS.benefitsTaper }} />
+                  Benefits taper
+                </span>
+                <span className="mtr-legend-item">
+                  <span className="mtr-swatch mtr-swatch-line" style={{ borderColor: MTR_COLORS.baselineLine }} />
+                  Autumn baseline
+                </span>
+              </div>
+              {mtrLoading ? (
+                <div className="multi-year-loading">
+                  Loading marginal tax rate data…
+                </div>
+              ) : (
+                <div className="impact-bar-chart mtr-chart" ref={mtrChartRef} />
               )}
             </section>
           )}
