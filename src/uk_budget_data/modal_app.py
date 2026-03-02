@@ -48,12 +48,13 @@ def fastapi_app():
 
     import asyncio
     from concurrent.futures import ThreadPoolExecutor
+    from typing import Optional
 
     from fastapi import FastAPI, HTTPException
     from fastapi.middleware.cors import CORSMiddleware
     from pydantic import BaseModel, Field
 
-    from spring_statement import calculate_household_impact
+    from spring_statement import calculate_household_impact, calculate_multi_year_net_impact
 
     executor = ThreadPoolExecutor(max_workers=3)
 
@@ -77,9 +78,14 @@ def fastapi_app():
         monthly_rent: float = Field(default=800, ge=0, le=5000)
         is_couple: bool = Field(default=False)
         partner_income: float = Field(default=0, ge=0, le=200000)
+        adult_age: int = Field(default=30, ge=16, le=100)
+        partner_age: int = Field(default=30, ge=16, le=100)
+        children_ages: Optional[list[int]] = Field(default=None)
         region: str = Field(default="LONDON")
         council_tax_band: str = Field(default="D")
         tenure_type: str = Field(default="RENT_PRIVATELY")
+        childcare_expenses: float = Field(default=0, ge=0, le=5000)
+        student_loan_plan: str = Field(default="NO_STUDENT_LOAN")
         year: int = Field(default=2026, ge=2025, le=2030)
 
     @api.get("/")
@@ -103,10 +109,45 @@ def fastapi_app():
                     monthly_rent=data.monthly_rent,
                     is_couple=data.is_couple,
                     partner_income=data.partner_income,
+                    year=data.year,
+                    adult_age=data.adult_age,
+                    partner_age=data.partner_age,
+                    children_ages=data.children_ages,
                     region=data.region,
                     council_tax_band=data.council_tax_band,
                     tenure_type=data.tenure_type,
-                    year=data.year,
+                    childcare_expenses=data.childcare_expenses,
+                    student_loan_plan=data.student_loan_plan,
+                ),
+            )
+            return result
+
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Calculation error: {e}")
+
+    @api.post("/spring-statement/multi-year")
+    async def spring_statement_multi_year(data: SpringStatementInput):
+        try:
+            loop = asyncio.get_event_loop()
+
+            result = await loop.run_in_executor(
+                executor,
+                lambda: calculate_multi_year_net_impact(
+                    employment_income=data.employment_income,
+                    num_children=data.num_children,
+                    monthly_rent=data.monthly_rent,
+                    is_couple=data.is_couple,
+                    partner_income=data.partner_income,
+                    adult_age=data.adult_age,
+                    partner_age=data.partner_age,
+                    children_ages=data.children_ages,
+                    region=data.region,
+                    council_tax_band=data.council_tax_band,
+                    tenure_type=data.tenure_type,
+                    childcare_expenses=data.childcare_expenses,
+                    student_loan_plan=data.student_loan_plan,
                 ),
             )
             return result

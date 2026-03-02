@@ -7,12 +7,13 @@ changes affect household taxes and benefits.
 import asyncio
 import os
 from concurrent.futures import ThreadPoolExecutor
+from typing import Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from .spring_statement import calculate_household_impact
+from .spring_statement import calculate_household_impact, calculate_multi_year_net_impact
 
 executor = ThreadPoolExecutor(max_workers=3)
 
@@ -49,6 +50,15 @@ class SpringStatementInput(BaseModel):
     partner_income: float = Field(
         default=0, ge=0, le=200000, description="Partner annual employment income (GBP)"
     )
+    adult_age: int = Field(
+        default=30, ge=16, le=100, description="Age of primary adult"
+    )
+    partner_age: int = Field(
+        default=30, ge=16, le=100, description="Age of partner"
+    )
+    children_ages: Optional[list[int]] = Field(
+        default=None, description="Ages of children (list of ints)"
+    )
     region: str = Field(
         default="LONDON", description="UK region"
     )
@@ -57,6 +67,12 @@ class SpringStatementInput(BaseModel):
     )
     tenure_type: str = Field(
         default="RENT_PRIVATELY", description="Housing tenure type"
+    )
+    childcare_expenses: float = Field(
+        default=0, ge=0, le=5000, description="Monthly childcare expenses (GBP)"
+    )
+    student_loan_plan: str = Field(
+        default="NO_STUDENT_LOAN", description="Student loan plan type"
     )
     year: int = Field(
         default=2026, ge=2025, le=2030, description="Tax year"
@@ -77,10 +93,47 @@ async def spring_statement(data: SpringStatementInput):
                 monthly_rent=data.monthly_rent,
                 is_couple=data.is_couple,
                 partner_income=data.partner_income,
+                year=data.year,
+                adult_age=data.adult_age,
+                partner_age=data.partner_age,
+                children_ages=data.children_ages,
                 region=data.region,
                 council_tax_band=data.council_tax_band,
                 tenure_type=data.tenure_type,
-                year=data.year,
+                childcare_expenses=data.childcare_expenses,
+                student_loan_plan=data.student_loan_plan,
+            ),
+        )
+        return result
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Calculation error: {e}")
+
+
+@app.post("/spring-statement/multi-year")
+async def spring_statement_multi_year(data: SpringStatementInput):
+    """Calculate net household income impact across years 2026-2030."""
+    try:
+        loop = asyncio.get_event_loop()
+
+        result = await loop.run_in_executor(
+            executor,
+            lambda: calculate_multi_year_net_impact(
+                employment_income=data.employment_income,
+                num_children=data.num_children,
+                monthly_rent=data.monthly_rent,
+                is_couple=data.is_couple,
+                partner_income=data.partner_income,
+                adult_age=data.adult_age,
+                partner_age=data.partner_age,
+                children_ages=data.children_ages,
+                region=data.region,
+                council_tax_band=data.council_tax_band,
+                tenure_type=data.tenure_type,
+                childcare_expenses=data.childcare_expenses,
+                student_loan_plan=data.student_loan_plan,
             ),
         )
         return result

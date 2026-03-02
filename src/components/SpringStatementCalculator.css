@@ -43,6 +43,23 @@ html {
   font-weight: 600;
 }
 
+/* About paragraph */
+.narrative-about {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: #475569;
+  margin: 0 0 24px 0;
+}
+
+.narrative-about a {
+  color: #319795;
+  text-decoration: none;
+}
+
+.narrative-about a:hover {
+  text-decoration: underline;
+}
+
 /* Controls Panel */
 .controls-panel {
   margin: 0 0 48px 0;
@@ -96,6 +113,10 @@ html {
   align-items: start;
 }
 
+.controls-row-6 {
+  grid-template-columns: repeat(6, 1fr);
+}
+
 .controls-row-4 {
   grid-template-columns: repeat(4, 1fr);
 }
@@ -108,18 +129,35 @@ html {
   grid-template-columns: repeat(2, 1fr);
 }
 
+.controls-row-secondary {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.control-span-2 {
+  grid-column: span 2;
+}
+
 @media (max-width: 900px) {
+  .controls-row-6 {
+    grid-template-columns: repeat(3, 1fr);
+  }
   .controls-row-4,
   .controls-row-3 {
     grid-template-columns: repeat(2, 1fr);
   }
+  .control-span-2 {
+    grid-column: span 1;
+  }
 }
 
 @media (max-width: 480px) {
+  .controls-row-6,
   .controls-row-4,
   .controls-row-3,
   .controls-row-2 {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
@@ -247,6 +285,31 @@ html {
 
 .checkbox-label span {
   white-space: nowrap;
+}
+
+/* Age Input */
+.age-input {
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #1e293b;
+  background: white;
+  box-sizing: border-box;
+  transition: all 0.15s ease;
+  width: 100%;
+}
+
+.age-input:hover {
+  border-color: #cbd5e1;
+}
+
+.age-input:focus {
+  outline: none;
+  border-color: #319795;
+  box-shadow: 0 0 0 2px rgba(49, 151, 149, 0.08);
 }
 
 /* Switch Toggle */
@@ -622,6 +685,81 @@ html {
   color: #94a3b8 !important;
 }
 
+/* Group header rows */
+.group-header-row {
+  cursor: pointer;
+}
+
+.group-header-row:hover td {
+  background: #e8edf2;
+}
+
+.group-header-row td {
+  padding: 10px 20px 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  background: #f1f5f9;
+  border-bottom: 1px solid #e2e8f0;
+  border-top: 1px solid #e2e8f0;
+}
+
+.impact-table tbody tr:first-child.group-header-row td {
+  border-top: none;
+}
+
+.group-chevron {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 6px;
+  color: #94a3b8;
+  transition: transform 0.15s ease;
+}
+
+.group-chevron.expanded {
+  transform: rotate(90deg);
+}
+
+/* Expandable rows */
+.expandable-row {
+  cursor: pointer;
+}
+
+.expandable-row:hover {
+  background: #f1f5f9 !important;
+}
+
+.row-chevron {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 6px;
+  color: #94a3b8;
+  transition: transform 0.15s ease;
+}
+
+.row-chevron.expanded {
+  transform: rotate(90deg);
+}
+
+.row-chevron-disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+.child-row td {
+  background: #f8fafc;
+  border-bottom-color: #f1f5f9 !important;
+  font-size: 0.88rem;
+}
+
+.child-row .child-label {
+  padding-left: 36px !important;
+  color: #64748b !important;
+  font-weight: 400 !important;
+}
+
 /* Impact Bar Chart */
 .impact-bar-chart {
   margin: 32px 0;
@@ -678,6 +816,40 @@ html {
 .bar-tooltip .tooltip-value {
   font-weight: 500;
   font-variant-numeric: tabular-nums;
+}
+
+.bar-tooltip .tooltip-breakdown {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.bar-tooltip .tooltip-breakdown-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.bar-tooltip .tooltip-breakdown-label {
+  color: #475569;
+  white-space: nowrap;
+}
+
+/* Multi-year chart */
+.multi-year-chart {
+  min-height: 340px;
+}
+
+.multi-year-loading {
+  padding: 48px 24px;
+  text-align: center;
+  color: #64748b;
+  font-size: 0.95rem;
 }
 
 /* Footer / Methodology */
