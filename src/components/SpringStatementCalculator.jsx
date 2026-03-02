@@ -616,8 +616,8 @@ export default function SpringStatementCalculator() {
           .html(
             `<div class="tooltip-label">£${d3.format(",.0f")(d.income)} income</div>` +
               `<div class="tooltip-breakdown">${rows}</div>` +
-              `<div class="tooltip-breakdown-row" style="margin-top:6px;padding-top:6px;border-top:1px solid #e2e8f0"><span style="font-weight:600">Spring forecast</span><span style="font-weight:700">${reformTotal}%</span></div>` +
-              `<div class="tooltip-breakdown-row"><span style="color:${MTR_COLORS.baselineLine}">Autumn baseline</span><span style="font-weight:600;color:${MTR_COLORS.baselineLine}">${baselineTotal}%</span></div>`
+              `<div class="tooltip-breakdown-row" style="margin-top:6px;padding-top:6px;border-top:1px solid #e2e8f0"><span style="font-weight:600">Post-Spring Statement</span><span style="font-weight:700">${reformTotal}%</span></div>` +
+              `<div class="tooltip-breakdown-row"><span style="color:${MTR_COLORS.baselineLine}">Pre-Spring Statement</span><span style="font-weight:600;color:${MTR_COLORS.baselineLine}">${baselineTotal}%</span></div>`
           );
       })
       .on("mouseout", () => tooltip.style("opacity", 0));
@@ -631,20 +631,21 @@ export default function SpringStatementCalculator() {
         <h1>Spring Statement Personal Calculator</h1>
         <p className="narrative-lead">
           See how the <strong>Spring Statement</strong> policy changes affect
-          your household's taxes and benefits compared to the Autumn Budget
-          baseline.
+          your household's taxes and benefits before and after the Spring
+          Statement.
         </p>
       </header>
 
       <p className="narrative-about">
-        The Spring Statement updated OBR inflation forecasts, which changes how
-        benefits and tax thresholds are uprated. This calculator uses{" "}
+        The Spring Statement 2025 updated OBR inflation forecasts, which
+        changes how benefits and tax thresholds are uprated. This calculator
+        uses{" "}
         <a href="https://policyengine.org" target="_blank" rel="noopener noreferrer">
           PolicyEngine UK
         </a>{" "}
-        to simulate the difference between the Autumn Budget baseline and the
-        Spring Statement reforms on your household's taxes, benefits, and net
-        income. Results are annual amounts for the selected tax year.
+        to simulate your household's taxes, benefits, and net income before
+        and after the Spring Statement. Results are annual amounts for the
+        selected tax year.
       </p>
 
       {/* Controls */}
@@ -967,8 +968,8 @@ export default function SpringStatementCalculator() {
                 <thead>
                   <tr>
                     <th>Program</th>
-                    <th>Autumn baseline</th>
-                    <th>Spring forecast</th>
+                    <th>Pre-Spring Statement</th>
+                    <th>Post-Spring Statement</th>
                     <th>Change</th>
                   </tr>
                 </thead>
@@ -1083,7 +1084,7 @@ export default function SpringStatementCalculator() {
               <h2>Impact over time</h2>
               <p>
                 Net household income impact for each tax year as CPI forecasts
-                diverge between the Autumn Budget and Spring Statement.
+                diverge before and after the Spring Statement.
               </p>
               {multiYearLoading ? (
                 <div className="multi-year-loading">
@@ -1101,8 +1102,8 @@ export default function SpringStatementCalculator() {
               <h2>Marginal tax rates</h2>
               <p>
                 How each additional pound of income is taxed. The coloured areas
-                show the Spring Statement rates; the dashed line shows the
-                Autumn Budget baseline.
+                show post-Spring Statement rates; the dashed line shows the
+                pre-Spring Statement baseline.
               </p>
               <div className="mtr-legend">
                 <span className="mtr-legend-item">
@@ -1119,7 +1120,7 @@ export default function SpringStatementCalculator() {
                 </span>
                 <span className="mtr-legend-item">
                   <span className="mtr-swatch mtr-swatch-line" style={{ borderColor: MTR_COLORS.baselineLine }} />
-                  Autumn baseline
+                  Pre-Spring Statement
                 </span>
               </div>
               {mtrLoading ? (
