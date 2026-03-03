@@ -595,11 +595,16 @@ def calculate_multi_year_net_impact(
         if not (p.get("region") and p["region"] != region)
     ]
 
-    for year in range(2026, 2031):
+    parameter_changes = {
+        CPI_PARAMETER: {
+            f"{yr}-01-01": rate for yr, rate in reform_cpi.items()
+        }
+    }
+
+    def _calculate_year(year):
         growth_factor = (1 + salary_growth_rate) ** (year - 2026)
         grown_income = employment_income * growth_factor
         grown_partner_income = partner_income * growth_factor if is_couple else partner_income
-
         grown_se_income = self_employment_income * growth_factor
 
         situation = _build_situation(
@@ -632,23 +637,15 @@ def calculate_multi_year_net_impact(
             except Exception:
                 return 0.0
 
-        # Baseline simulation (Autumn Budget defaults)
         baseline_sim = Simulation(situation=situation)
         baseline_net = float(baseline_sim.calculate("household_net_income", year)[0])
 
-        # Reform simulation (Spring Statement CPI overrides)
-        parameter_changes = {
-            CPI_PARAMETER: {
-                f"{yr}-01-01": rate for yr, rate in reform_cpi.items()
-            }
-        }
         scenario = Scenario(parameter_changes=parameter_changes)
         reform_sim = Simulation(situation=situation, scenario=scenario)
         reform_net = float(reform_sim.calculate("household_net_income", year)[0])
 
-        yearly_impact[str(year)] = round(reform_net - baseline_net, 2)
+        impact = round(reform_net - baseline_net, 2)
 
-        # Per-program breakdown (only non-zero diffs)
         breakdown = []
         for prog in top_programs:
             b_val = _calc(baseline_sim, prog["id"], prog["entity"])
@@ -660,7 +657,16 @@ def calculate_multi_year_net_impact(
                     "label": prog["label"],
                     "impact": round(household_impact, 2),
                 })
-        yearly_breakdown[str(year)] = breakdown
+
+        return str(year), impact, breakdown
+
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=5) as pool:
+        futures = [pool.submit(_calculate_year, yr) for yr in range(2026, 2031)]
+        for future in futures:
+            year_str, impact, breakdown = future.result()
+            yearly_impact[year_str] = impact
+            yearly_breakdown[year_str] = breakdown
 
     return {"yearly_impact": yearly_impact, "yearly_breakdown": yearly_breakdown}
 
