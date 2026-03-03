@@ -1225,8 +1225,8 @@ export default function SpringStatementCalculator() {
               <h2>Marginal tax rates</h2>
               <p>
                 How each additional pound of income is taxed. The coloured areas
-                show post-Spring Statement rates; the dashed line shows the
-                pre-Spring Statement baseline.
+                show the breakdown by component; the dashed line shows the
+                overall marginal tax rate.
               </p>
               <div className="mtr-legend">
                 <span className="mtr-legend-item">
@@ -1242,8 +1242,8 @@ export default function SpringStatementCalculator() {
                   Benefits taper
                 </span>
                 <span className="mtr-legend-item">
-                  <span className="mtr-swatch mtr-swatch-line" style={{ borderColor: MTR_COLORS.baselineLine }} />
-                  Pre-Spring Statement
+                  <span className="mtr-swatch mtr-swatch-line" style={{ borderColor: MTR_COLORS.reformLine }} />
+                  Overall MTR
                 </span>
               </div>
               {mtrLoading ? (
