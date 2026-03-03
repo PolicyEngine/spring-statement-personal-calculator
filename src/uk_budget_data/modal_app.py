@@ -35,6 +35,8 @@ image = (
     image=image,
     timeout=300,
     memory=2048,
+    min_containers=1,
+    scaledown_window=300,
 )
 @modal.concurrent(max_inputs=10)
 @modal.asgi_app()
@@ -43,8 +45,14 @@ def fastapi_app():
     import sys
     sys.path.insert(0, "/root")
 
-    # Pre-warm PolicyEngine on container start
-    from policyengine_uk import Simulation  # noqa: F401
+    # Fully pre-warm PolicyEngine on container start:
+    # Import + run a dummy simulation to compile the parameter tree and JIT paths
+    from policyengine_uk import Simulation
+    Simulation(situation={
+        "people": {"a": {"age": {2026: 30}, "employment_income": {2026: 30000}}},
+        "benunits": {"b": {"members": ["a"]}},
+        "households": {"h": {"members": ["a"]}},
+    }).calculate("household_net_income", 2026)
 
     import asyncio
     from concurrent.futures import ThreadPoolExecutor
