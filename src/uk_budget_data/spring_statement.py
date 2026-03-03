@@ -163,27 +163,6 @@ PROGRAM_STRUCTURE = [
             {"id": "child_benefit_less_tax_charge", "label": "After High-Income Tax Charge", "entity": BENUNIT_VARS},
         ],
     },
-    {
-        "id": "housing_benefit",
-        "label": "Housing Benefit",
-        "entity": BENUNIT_VARS,
-        "is_tax": False,
-        "group": "core_benefits",
-    },
-    {
-        "id": "working_tax_credit",
-        "label": "Working Tax Credit",
-        "entity": BENUNIT_VARS,
-        "is_tax": False,
-        "group": "core_benefits",
-    },
-    {
-        "id": "child_tax_credit",
-        "label": "Child Tax Credit",
-        "entity": BENUNIT_VARS,
-        "is_tax": False,
-        "group": "core_benefits",
-    },
     # ── PENSION & RETIREMENT ─────────────────────────────────────────────
     {
         "id": "state_pension",
