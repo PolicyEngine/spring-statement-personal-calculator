@@ -5,6 +5,8 @@ taxes and benefits using PolicyEngine UK. Runs a baseline (Autumn Budget)
 and a reform (Spring Statement) simulation, then returns per-program diffs.
 """
 
+from functools import lru_cache
+
 from policyengine_uk import Simulation, Scenario
 
 CPI_YEARS = range(2025, 2031)
@@ -21,6 +23,30 @@ SPRING_CPI = {
 
 # The source parameter that feeds the uprating pipeline.
 CPI_PARAMETER = "gov.economic_assumptions.yoy_growth.obr.consumer_price_index"
+
+# Pre-built reform parameter changes (same for every request using default CPI)
+_DEFAULT_PARAMETER_CHANGES = {
+    CPI_PARAMETER: {
+        f"{yr}-01-01": rate for yr, rate in SPRING_CPI.items()
+    }
+}
+
+
+@lru_cache(maxsize=4)
+def _get_scenario(cpi_key: tuple) -> Scenario:
+    """Cache Scenario objects — expensive to create, identical across requests."""
+    cpi_dict = dict(cpi_key)
+    parameter_changes = {
+        CPI_PARAMETER: {f"{yr}-01-01": rate for yr, rate in cpi_dict.items()}
+    }
+    return Scenario(parameter_changes=parameter_changes)
+
+
+def _get_reform_scenario(spring_cpi: dict = None) -> Scenario:
+    """Get a cached reform Scenario for the given CPI values."""
+    cpi = spring_cpi if spring_cpi is not None else SPRING_CPI
+    return _get_scenario(tuple(sorted(cpi.items())))
+
 
 # ---------------------------------------------------------------------------
 # Variable extraction config: (variable_name, entity_level)
@@ -504,13 +530,7 @@ def calculate_household_impact(
     autumn_cpi = _get_autumn_cpi(baseline_sim)
 
     # Reform simulation — override CPI YoY growth rates with Spring values.
-    reform_cpi = spring_cpi if spring_cpi is not None else SPRING_CPI
-    parameter_changes = {
-        CPI_PARAMETER: {
-            f"{yr}-01-01": rate for yr, rate in reform_cpi.items()
-        }
-    }
-    scenario = Scenario(parameter_changes=parameter_changes)
+    scenario = _get_reform_scenario(spring_cpi)
     reform_sim = Simulation(situation=situation, scenario=scenario)
     reform = _extract_results(reform_sim, situation, year)
 
@@ -551,7 +571,7 @@ def calculate_household_impact(
         "program_groups": PROGRAM_GROUPS,
         "cpi_values": {
             "autumn": autumn_cpi,
-            "spring": reform_cpi,
+            "spring": spring_cpi if spring_cpi is not None else SPRING_CPI,
         },
     }
 
@@ -579,7 +599,6 @@ def calculate_multi_year_net_impact(
     Much lighter than calling calculate_household_impact() 5x because it only
     extracts household_net_income rather than all 35+ program variables.
     """
-    reform_cpi = spring_cpi if spring_cpi is not None else SPRING_CPI
     yearly_impact = {}
     yearly_breakdown = {}
 
@@ -595,11 +614,7 @@ def calculate_multi_year_net_impact(
         if not (p.get("region") and p["region"] != region)
     ]
 
-    parameter_changes = {
-        CPI_PARAMETER: {
-            f"{yr}-01-01": rate for yr, rate in reform_cpi.items()
-        }
-    }
+    scenario = _get_reform_scenario(spring_cpi)
 
     def _calculate_year(year):
         growth_factor = (1 + salary_growth_rate) ** (year - 2026)
@@ -640,7 +655,6 @@ def calculate_multi_year_net_impact(
         baseline_sim = Simulation(situation=situation)
         baseline_net = float(baseline_sim.calculate("household_net_income", year)[0])
 
-        scenario = Scenario(parameter_changes=parameter_changes)
         reform_sim = Simulation(situation=situation, scenario=scenario)
         reform_net = float(reform_sim.calculate("household_net_income", year)[0])
 
@@ -711,12 +725,8 @@ def calculate_mtr_data(
     """
     import numpy as np
 
-    reform_cpi = spring_cpi if spring_cpi is not None else SPRING_CPI
     num_points = 50
-
-    parameter_changes = {
-        CPI_PARAMETER: {f"{yr}-01-01": rate for yr, rate in reform_cpi.items()}
-    }
+    scenario = _get_reform_scenario(spring_cpi)
 
     # Build the situation with axes (varies employment_income for the adult)
     people = {
@@ -784,7 +794,6 @@ def calculate_mtr_data(
 
     def _run_scenario(use_reform: bool) -> list[dict]:
         if use_reform:
-            scenario = Scenario(parameter_changes=parameter_changes)
             sim = Simulation(situation=situation, scenario=scenario)
         else:
             sim = Simulation(situation=situation)
