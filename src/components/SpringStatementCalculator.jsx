@@ -689,7 +689,8 @@ export default function SpringStatementCalculator() {
         </div>
 
         <div className="controls-group">
-          <div className="controls-row controls-row-6" style={{ marginBottom: 14 }}>
+          {/* Personal details */}
+          <div className="controls-row controls-row-6">
             <div className="control-item control-span-2">
               <label>Employment income</label>
               <div className="salary-input-wrapper">
@@ -705,7 +706,6 @@ export default function SpringStatementCalculator() {
                   placeholder="e.g. 30000"
                 />
               </div>
-              <span className="control-hint">Employment, self-employment, etc.</span>
             </div>
             <div className="control-item control-span-2">
               <label>Self-employment income</label>
@@ -736,51 +736,8 @@ export default function SpringStatementCalculator() {
               />
             </div>
           </div>
-          <div className="controls-row controls-row-6">
-            <div className="control-item control-span-2">
-              <label>Monthly rent</label>
-              <div className="salary-input-wrapper">
-                <span className="currency-symbol">£</span>
-                <input
-                  type="number"
-                  value={draftRent}
-                  onChange={(e) =>
-                    setDraftRent(parseFloat(e.target.value) || 0)
-                  }
-                  min={0}
-                  step={50}
-                />
-              </div>
-            </div>
-            <div className="control-item control-span-2">
-              <label>Children</label>
-              <select
-                value={draftChildren}
-                onChange={(e) => setDraftChildren(parseInt(e.target.value))}
-              >
-                {[0, 1, 2, 3, 4, 5, 6].map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="control-item control-span-2">
-              <label>Fiscal year</label>
-              <select
-                value={draftYear}
-                onChange={(e) => setDraftYear(parseInt(e.target.value))}
-              >
-                {[2025, 2026, 2027, 2028, 2029, 2030].map((y) => (
-                  <option key={y} value={y}>
-                    {y}-{String(y + 1).slice(-2)}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
 
-          {/* Second row: couple + children ages (only if applicable) */}
+          {/* Partner */}
           <div className="controls-row controls-row-6 controls-row-secondary">
             <div className="control-item control-span-2">
               <label>Couple</label>
@@ -828,30 +785,75 @@ export default function SpringStatementCalculator() {
               </>
             )}
           </div>
-          {draftChildrenAges.length > 0 && (
-            <div className="controls-row controls-row-6 controls-row-secondary">
-              {draftChildrenAges.map((age, i) => (
-                <div className="control-item control-span-2" key={i}>
-                  <label>Child {i + 1} age</label>
-                  <input
-                    type="number"
-                    value={age}
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value) || 0;
-                      setDraftChildrenAges((prev) => {
-                        const next = [...prev];
-                        next[i] = Math.min(Math.max(val, 0), 18);
-                        return next;
-                      });
-                    }}
-                    min={0}
-                    max={18}
-                    className="age-input"
-                  />
-                </div>
-              ))}
+
+          {/* Children */}
+          <div className="controls-row controls-row-6">
+            <div className="control-item control-span-2">
+              <label>Children</label>
+              <select
+                value={draftChildren}
+                onChange={(e) => setDraftChildren(parseInt(e.target.value))}
+              >
+                {[0, 1, 2, 3, 4, 5, 6].map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
             </div>
-          )}
+            {draftChildrenAges.map((age, i) => (
+              <div className="control-item control-span-2" key={i}>
+                <label>Child {i + 1} age</label>
+                <input
+                  type="number"
+                  value={age}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value) || 0;
+                    setDraftChildrenAges((prev) => {
+                      const next = [...prev];
+                      next[i] = Math.min(Math.max(val, 0), 18);
+                      return next;
+                    });
+                  }}
+                  min={0}
+                  max={18}
+                  className="age-input"
+                />
+              </div>
+            ))}
+          </div>
+
+          {/* Household */}
+          <div className="controls-row controls-row-6">
+            <div className="control-item control-span-2">
+              <label>Monthly rent</label>
+              <div className="salary-input-wrapper">
+                <span className="currency-symbol">£</span>
+                <input
+                  type="number"
+                  value={draftRent}
+                  onChange={(e) =>
+                    setDraftRent(parseFloat(e.target.value) || 0)
+                  }
+                  min={0}
+                  step={50}
+                />
+              </div>
+            </div>
+            <div className="control-item control-span-2">
+              <label>Fiscal year</label>
+              <select
+                value={draftYear}
+                onChange={(e) => setDraftYear(parseInt(e.target.value))}
+              >
+                {[2025, 2026, 2027, 2028, 2029, 2030].map((y) => (
+                  <option key={y} value={y}>
+                    {y}-{String(y + 1).slice(-2)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
 
         {/* Collapsible household details section */}
