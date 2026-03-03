@@ -1061,17 +1061,19 @@ export default function SpringStatementCalculator() {
         </div>
       </div>
 
-      {/* Loading / Error */}
-      {loading && (
-        <div className="api-loading">
-          Running PolicyEngine simulations… this may take a moment.
-        </div>
-      )}
+      {/* Error */}
       {error && <div className="api-error">Error: {error}</div>}
 
-      {/* Results */}
-      {hasCalculated && result && !loading && (
+      {/* Results — each section appears independently as its data arrives */}
+      {(loading || hasCalculated) && !error && (
         <>
+          {/* Headline + Breakdown */}
+          {loading && !result ? (
+            <div className="api-loading">
+              Running PolicyEngine simulations… this may take a moment.
+            </div>
+          ) : result && (
+            <>
           {/* Headline */}
           <div
             className={`impact-headline ${netImpact > 0.5 ? "positive" : netImpact < -0.5 ? "negative" : "neutral"}`}
@@ -1209,6 +1211,8 @@ export default function SpringStatementCalculator() {
               </table>
             </div>
           </section>
+            </>
+          )}
 
           {/* Multi-Year Impact Chart */}
           {(multiYearLoading || multiYearChartData.length > 0) && (
