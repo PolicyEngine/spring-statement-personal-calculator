@@ -39,7 +39,6 @@ image = (
     min_containers=1,
     scaledown_window=300,
 )
-@modal.concurrent(max_inputs=10)
 @modal.asgi_app()
 def fastapi_app():
     """Serve the FastAPI app via Modal."""
