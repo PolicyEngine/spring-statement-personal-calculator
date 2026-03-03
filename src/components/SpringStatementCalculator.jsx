@@ -119,6 +119,9 @@ export default function SpringStatementCalculator() {
   const [mtrData, setMtrData] = useState(null);
   const [mtrLoading, setMtrLoading] = useState(false);
 
+  // Side nav scroll tracking
+  const [activeSection, setActiveSection] = useState(null);
+
   // Chart refs
   const multiYearChartRef = useRef(null);
   const mtrChartRef = useRef(null);
@@ -650,12 +653,37 @@ export default function SpringStatementCalculator() {
       .on("mouseout", () => tooltip.style("opacity", 0));
   }, [mtrData, draftIncome]);
 
+  // IntersectionObserver for side nav scroll tracking
+  const SECTION_IDS = ["section-input", "section-breakdown", "section-mtr", "section-timeline"];
+  const SECTION_LABELS = { "section-input": "Input", "section-breakdown": "Breakdown", "section-mtr": "MTR", "section-timeline": "Timeline" };
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // Pick the entry with the largest intersection ratio
+        let best = null;
+        for (const entry of entries) {
+          if (entry.isIntersecting && (!best || entry.intersectionRatio > best.intersectionRatio)) {
+            best = entry;
+          }
+        }
+        if (best) setActiveSection(best.target.id);
+      },
+      { rootMargin: "-20% 0px -60% 0px", threshold: [0, 0.25, 0.5, 0.75, 1] }
+    );
+    for (const id of SECTION_IDS) {
+      const el = document.getElementById(id);
+      if (el) observer.observe(el);
+    }
+    return () => observer.disconnect();
+  }, [hasCalculated, loading, result, mtrData, multiYearData]);
+
   const netImpact = result?.impact?.household_net_income || 0;
 
   return (
     <div className="narrative-container">
-      <header className="narrative-hero">
-        <h1>Spring Statement Personal Calculator</h1>
+      <header className="narrative-hero" id="section-input">
+        <h1>Spring Statement personal calculator</h1>
         <p className="narrative-lead">
           See how the <strong>Spring Statement 2026</strong> policy changes
           affect your household's taxes and benefits before and after the
@@ -1071,7 +1099,7 @@ export default function SpringStatementCalculator() {
         <>
           {/* Headline + Breakdown */}
           {loading && !result ? (
-            <section className="narrative-section">
+            <section className="narrative-section" id="section-breakdown">
               <h2>Breakdown by program</h2>
               <div className="multi-year-loading">
                 Loading breakdown…
@@ -1100,7 +1128,7 @@ export default function SpringStatementCalculator() {
           </div>
 
           {/* Impact Table */}
-          <section className="narrative-section">
+          <section className="narrative-section" id="section-breakdown">
             <h2>Breakdown by program</h2>
             <div className="impact-table-container">
               <table className="impact-table">
@@ -1221,7 +1249,7 @@ export default function SpringStatementCalculator() {
 
           {/* MTR Chart */}
           {(mtrLoading || mtrData?.reform?.length > 0) && (
-            <section className="narrative-section">
+            <section className="narrative-section" id="section-mtr">
               <h2>Marginal tax rates</h2>
               <p>
                 How each additional pound of income is taxed. The coloured areas
@@ -1258,7 +1286,7 @@ export default function SpringStatementCalculator() {
 
           {/* Multi-Year Impact Chart */}
           {(multiYearLoading || multiYearChartData.length > 0) && (
-            <section className="narrative-section">
+            <section className="narrative-section" id="section-timeline">
               <h2>Impact over time</h2>
               <p>
                 Net household income impact for each fiscal year as OBR forecasts
@@ -1275,6 +1303,26 @@ export default function SpringStatementCalculator() {
           )}
 
         </>
+      )}
+
+      {/* Side scroll nav */}
+      {activeSection && (
+        <nav className="side-scroll-nav">
+          {SECTION_IDS.map((id) => {
+            const el = document.getElementById(id);
+            if (!el) return null;
+            return (
+              <button
+                key={id}
+                className={`side-scroll-item ${activeSection === id ? "active" : ""}`}
+                onClick={() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" })}
+              >
+                <span className="side-scroll-label">{SECTION_LABELS[id]}</span>
+                <span className="side-scroll-dot" />
+              </button>
+            );
+          })}
+        </nav>
       )}
     </div>
   );
