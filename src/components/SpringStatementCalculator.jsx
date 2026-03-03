@@ -1306,7 +1306,7 @@ export default function SpringStatementCalculator() {
       )}
 
       {/* Side scroll nav */}
-      {activeSection && (
+      {activeSection && (loading || hasCalculated) && !error && (
         <nav className="side-scroll-nav">
           {SECTION_IDS.map((id) => {
             const el = document.getElementById(id);
