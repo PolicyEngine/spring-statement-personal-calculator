@@ -81,7 +81,6 @@ export default function SpringStatementCalculator() {
   const [draftPartnerAge, setDraftPartnerAge] = useState(30);
   const [draftYear, setDraftYear] = useState(2026);
   const [draftRegion, setDraftRegion] = useState("LONDON");
-  const [draftCouncilTaxBand, setDraftCouncilTaxBand] = useState("D");
   const [draftTenureType, setDraftTenureType] = useState("RENT_PRIVATELY");
   const [draftSelfEmploymentIncome, setDraftSelfEmploymentIncome] = useState(0);
   const [draftChildcare, setDraftChildcare] = useState(0);
@@ -149,7 +148,6 @@ export default function SpringStatementCalculator() {
       adult_age: draftAdultAge,
       partner_age: draftPartnerAge,
       region: draftRegion,
-      council_tax_band: draftCouncilTaxBand,
       tenure_type: draftTenureType,
       childcare_expenses: draftChildcare,
       student_loan_plan: effectiveStudentLoanPlan,
@@ -234,7 +232,6 @@ export default function SpringStatementCalculator() {
     draftPartnerAge,
     draftYear,
     draftRegion,
-    draftCouncilTaxBand,
     draftTenureType,
     draftSelfEmploymentIncome,
     draftChildcare,
@@ -705,8 +702,10 @@ export default function SpringStatementCalculator() {
                   }
                   min={0}
                   step={1000}
+                  placeholder="e.g. 30000"
                 />
               </div>
+              <span className="control-hint">Employment, self-employment, etc.</span>
             </div>
             <div className="control-item control-span-2">
               <label>Self-employment income</label>

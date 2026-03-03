@@ -81,13 +81,6 @@ PROGRAM_STRUCTURE = [
     },
     # ── PROPERTY & LOCAL TAXES ───────────────────────────────────────────
     {
-        "id": "council_tax",
-        "label": "Council Tax",
-        "entity": HOUSEHOLD_VARS,
-        "is_tax": True,
-        "group": "property_local_taxes",
-    },
-    {
         "id": "domestic_rates",
         "label": "Domestic Rates (NI)",
         "entity": HOUSEHOLD_VARS,
@@ -685,9 +678,6 @@ _MTR_TAX_VARS = [
 _MTR_BENEFIT_VARS = [
     ("universal_credit", BENUNIT_VARS),
     ("child_benefit", BENUNIT_VARS),
-    ("housing_benefit", BENUNIT_VARS),
-    ("working_tax_credit", BENUNIT_VARS),
-    ("child_tax_credit", BENUNIT_VARS),
     ("pension_credit", BENUNIT_VARS),
 ]
 
@@ -801,11 +791,8 @@ def calculate_mtr_data(
         # Benunit / household level vars: one value per point
         uc = sim.calculate("universal_credit", year)
         cb = sim.calculate("child_benefit", year)
-        hb = sim.calculate("housing_benefit", year)
-        wtc = sim.calculate("working_tax_credit", year)
-        ctc = sim.calculate("child_tax_credit", year)
         pc = sim.calculate("pension_credit", year)
-        benefits = uc + cb + hb + wtc + ctc + pc
+        benefits = uc + cb + pc
 
         net_income = sim.calculate("household_net_income", year)
 
