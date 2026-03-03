@@ -716,6 +716,7 @@ def calculate_mtr_data(
     tenure_type: str = "RENT_PRIVATELY",
     childcare_expenses: float = 0,
     student_loan_plan: str = "NO_STUDENT_LOAN",
+    self_employment_income: float = 0,
     spring_cpi: dict = None,
 ) -> dict:
     """Calculate marginal tax rates across an income range for baseline and reform.
@@ -736,6 +737,9 @@ def calculate_mtr_data(
         }
     }
     members = ["adult"]
+
+    if self_employment_income > 0:
+        people["adult"]["self_employment_income"] = {year: self_employment_income}
 
     if student_loan_plan != "NO_STUDENT_LOAN":
         people["adult"]["student_loan_plan"] = {year: student_loan_plan}
