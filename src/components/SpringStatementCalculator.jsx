@@ -1069,9 +1069,12 @@ export default function SpringStatementCalculator() {
         <>
           {/* Headline + Breakdown */}
           {loading && !result ? (
-            <div className="api-loading">
-              Running PolicyEngine simulations… this may take a moment.
-            </div>
+            <section className="narrative-section">
+              <h2>Breakdown by program</h2>
+              <div className="multi-year-loading">
+                Loading breakdown…
+              </div>
+            </section>
           ) : result && (
             <>
           {/* Headline */}
