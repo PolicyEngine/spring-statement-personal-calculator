@@ -1217,24 +1217,6 @@ export default function SpringStatementCalculator() {
             </>
           )}
 
-          {/* Multi-Year Impact Chart */}
-          {(multiYearLoading || multiYearChartData.length > 0) && (
-            <section className="narrative-section">
-              <h2>Impact over time</h2>
-              <p>
-                Net household income impact for each fiscal year as OBR forecasts
-                diverge before and after the Spring Statement.
-              </p>
-              {multiYearLoading ? (
-                <div className="multi-year-loading">
-                  Loading multi-year projections…
-                </div>
-              ) : (
-                <div className="impact-bar-chart multi-year-chart" ref={multiYearChartRef} />
-              )}
-            </section>
-          )}
-
           {/* MTR Chart */}
           {(mtrLoading || mtrData?.reform?.length > 0) && (
             <section className="narrative-section">
@@ -1268,6 +1250,24 @@ export default function SpringStatementCalculator() {
                 </div>
               ) : (
                 <div className="impact-bar-chart mtr-chart" ref={mtrChartRef} />
+              )}
+            </section>
+          )}
+
+          {/* Multi-Year Impact Chart */}
+          {(multiYearLoading || multiYearChartData.length > 0) && (
+            <section className="narrative-section">
+              <h2>Impact over time</h2>
+              <p>
+                Net household income impact for each fiscal year as OBR forecasts
+                diverge before and after the Spring Statement.
+              </p>
+              {multiYearLoading ? (
+                <div className="multi-year-loading">
+                  Loading multi-year projections…
+                </div>
+              ) : (
+                <div className="impact-bar-chart multi-year-chart" ref={multiYearChartRef} />
               )}
             </section>
           )}
