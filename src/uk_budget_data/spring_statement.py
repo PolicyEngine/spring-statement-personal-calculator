@@ -496,31 +496,23 @@ def calculate_household_impact(
         self_employment_income=self_employment_income,
     )
 
-    from concurrent.futures import ThreadPoolExecutor
+    # Baseline simulation — PolicyEngine defaults reflect Autumn Budget parameters
+    baseline_sim = Simulation(situation=situation)
+    baseline = _extract_results(baseline_sim, situation, year)
 
+    # Read baseline CPI values from PE UK's parameter tree (instead of hardcoding)
+    autumn_cpi = _get_autumn_cpi(baseline_sim)
+
+    # Reform simulation — override CPI YoY growth rates with Spring values.
     reform_cpi = spring_cpi if spring_cpi is not None else SPRING_CPI
     parameter_changes = {
         CPI_PARAMETER: {
             f"{yr}-01-01": rate for yr, rate in reform_cpi.items()
         }
     }
-
-    def _run_baseline():
-        sim = Simulation(situation=situation)
-        results = _extract_results(sim, situation, year)
-        cpi = _get_autumn_cpi(sim)
-        return results, cpi
-
-    def _run_reform():
-        scenario = Scenario(parameter_changes=parameter_changes)
-        sim = Simulation(situation=situation, scenario=scenario)
-        return _extract_results(sim, situation, year)
-
-    with ThreadPoolExecutor(max_workers=2) as pool:
-        baseline_future = pool.submit(_run_baseline)
-        reform_future = pool.submit(_run_reform)
-        baseline, autumn_cpi = baseline_future.result()
-        reform = reform_future.result()
+    scenario = Scenario(parameter_changes=parameter_changes)
+    reform_sim = Simulation(situation=situation, scenario=scenario)
+    reform = _extract_results(reform_sim, situation, year)
 
     # Compute impact for all variables
     impact = {}
@@ -603,18 +595,11 @@ def calculate_multi_year_net_impact(
         if not (p.get("region") and p["region"] != region)
     ]
 
-    from concurrent.futures import ThreadPoolExecutor
-
-    parameter_changes = {
-        CPI_PARAMETER: {
-            f"{yr}-01-01": rate for yr, rate in reform_cpi.items()
-        }
-    }
-
-    def _calculate_year(year):
+    for year in range(2026, 2031):
         growth_factor = (1 + salary_growth_rate) ** (year - 2026)
         grown_income = employment_income * growth_factor
         grown_partner_income = partner_income * growth_factor if is_couple else partner_income
+
         grown_se_income = self_employment_income * growth_factor
 
         situation = _build_situation(
@@ -647,15 +632,23 @@ def calculate_multi_year_net_impact(
             except Exception:
                 return 0.0
 
+        # Baseline simulation (Autumn Budget defaults)
         baseline_sim = Simulation(situation=situation)
         baseline_net = float(baseline_sim.calculate("household_net_income", year)[0])
 
+        # Reform simulation (Spring Statement CPI overrides)
+        parameter_changes = {
+            CPI_PARAMETER: {
+                f"{yr}-01-01": rate for yr, rate in reform_cpi.items()
+            }
+        }
         scenario = Scenario(parameter_changes=parameter_changes)
         reform_sim = Simulation(situation=situation, scenario=scenario)
         reform_net = float(reform_sim.calculate("household_net_income", year)[0])
 
-        impact = round(reform_net - baseline_net, 2)
+        yearly_impact[str(year)] = round(reform_net - baseline_net, 2)
 
+        # Per-program breakdown (only non-zero diffs)
         breakdown = []
         for prog in top_programs:
             b_val = _calc(baseline_sim, prog["id"], prog["entity"])
@@ -667,15 +660,7 @@ def calculate_multi_year_net_impact(
                     "label": prog["label"],
                     "impact": round(household_impact, 2),
                 })
-
-        return str(year), impact, breakdown
-
-    with ThreadPoolExecutor(max_workers=5) as pool:
-        futures = [pool.submit(_calculate_year, yr) for yr in range(2026, 2031)]
-        for future in futures:
-            year_str, impact, breakdown = future.result()
-            yearly_impact[year_str] = impact
-            yearly_breakdown[year_str] = breakdown
+        yearly_breakdown[str(year)] = breakdown
 
     return {"yearly_impact": yearly_impact, "yearly_breakdown": yearly_breakdown}
 
@@ -830,93 +815,7 @@ def calculate_mtr_data(
 
         return mtr_data
 
-    from concurrent.futures import ThreadPoolExecutor
-
-    with ThreadPoolExecutor(max_workers=2) as pool:
-        baseline_future = pool.submit(_run_scenario, False)
-        reform_future = pool.submit(_run_scenario, True)
-        baseline = baseline_future.result()
-        reform = reform_future.result()
+    baseline = _run_scenario(False)
+    reform = _run_scenario(True)
 
     return {"baseline": baseline, "reform": reform}
-
-
-def calculate_all(
-    employment_income: float,
-    num_children: int,
-    monthly_rent: float,
-    is_couple: bool,
-    partner_income: float,
-    year: int = 2026,
-    adult_age: int = 30,
-    partner_age: int = 30,
-    children_ages: list = None,
-    region: str = "LONDON",
-    council_tax_band: str = "D",
-    tenure_type: str = "RENT_PRIVATELY",
-    childcare_expenses: float = 0,
-    student_loan_plan: str = "NO_STUDENT_LOAN",
-    self_employment_income: float = 0,
-    salary_growth_rate: float = 0.0,
-    spring_cpi: dict = None,
-) -> dict:
-    """Run main, multi-year, and MTR calculations in parallel.
-
-    Returns combined results in a single response to avoid multiple roundtrips.
-    """
-    from concurrent.futures import ThreadPoolExecutor
-
-    common = dict(
-        num_children=num_children,
-        monthly_rent=monthly_rent,
-        is_couple=is_couple,
-        partner_income=partner_income,
-        adult_age=adult_age,
-        partner_age=partner_age,
-        children_ages=children_ages,
-        region=region,
-        council_tax_band=council_tax_band,
-        tenure_type=tenure_type,
-        childcare_expenses=childcare_expenses,
-        student_loan_plan=student_loan_plan,
-    )
-
-    def _main():
-        return calculate_household_impact(
-            employment_income=employment_income,
-            self_employment_income=self_employment_income,
-            year=year,
-            spring_cpi=spring_cpi,
-            **common,
-        )
-
-    def _multi_year():
-        return calculate_multi_year_net_impact(
-            employment_income=employment_income,
-            self_employment_income=self_employment_income,
-            salary_growth_rate=salary_growth_rate,
-            spring_cpi=spring_cpi,
-            **common,
-        )
-
-    def _mtr():
-        return calculate_mtr_data(
-            year=year,
-            spring_cpi=spring_cpi,
-            **common,
-        )
-
-    with ThreadPoolExecutor(max_workers=3) as pool:
-        main_future = pool.submit(_main)
-        multi_year_future = pool.submit(_multi_year)
-        mtr_future = pool.submit(_mtr)
-
-        main_result = main_future.result()
-        multi_year_result = multi_year_future.result()
-        mtr_result = mtr_future.result()
-
-    return {
-        "main": main_result,
-        "multi_year": multi_year_result,
-        "mtr": mtr_result,
-    }
