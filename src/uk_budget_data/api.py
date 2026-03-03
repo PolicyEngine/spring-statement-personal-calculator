@@ -17,9 +17,10 @@ from .spring_statement import (
     calculate_household_impact,
     calculate_multi_year_net_impact,
     calculate_mtr_data,
+    calculate_all,
 )
 
-executor = ThreadPoolExecutor(max_workers=3)
+executor = ThreadPoolExecutor(max_workers=6)
 
 app = FastAPI(
     title="Spring Statement Personal Calculator API",
@@ -188,6 +189,41 @@ async def spring_statement_mtr(data: SpringStatementInput):
                 tenure_type=data.tenure_type,
                 childcare_expenses=data.childcare_expenses,
                 student_loan_plan=data.student_loan_plan,
+            ),
+        )
+        return result
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Calculation error: {e}")
+
+
+@app.post("/spring-statement/all")
+async def spring_statement_all(data: SpringStatementInput):
+    """Run all calculations (main, multi-year, MTR) in a single request."""
+    try:
+        loop = asyncio.get_event_loop()
+
+        result = await loop.run_in_executor(
+            executor,
+            lambda: calculate_all(
+                employment_income=data.employment_income,
+                self_employment_income=data.self_employment_income,
+                num_children=data.num_children,
+                monthly_rent=data.monthly_rent,
+                is_couple=data.is_couple,
+                partner_income=data.partner_income,
+                year=data.year,
+                adult_age=data.adult_age,
+                partner_age=data.partner_age,
+                children_ages=data.children_ages,
+                region=data.region,
+                council_tax_band=data.council_tax_band,
+                tenure_type=data.tenure_type,
+                childcare_expenses=data.childcare_expenses,
+                student_loan_plan=data.student_loan_plan,
+                salary_growth_rate=data.salary_growth_rate,
             ),
         )
         return result

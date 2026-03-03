@@ -158,28 +158,13 @@ export default function SpringStatementCalculator() {
       year: draftYear,
     };
 
-    // Fire main and multi-year requests in parallel
-    const mainPromise = fetch(`${API_URL}/spring-statement`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(requestBody),
-    });
-
-    const multiYearPromise = fetch(`${API_URL}/spring-statement/multi-year`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(requestBody),
-    });
-
-    const mtrPromise = fetch(`${API_URL}/spring-statement/mtr`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(requestBody),
-    });
-
-    // Handle main request
+    // Single combined request — all calculations run in parallel on the server
     try {
-      const response = await mainPromise;
+      const response = await fetch(`${API_URL}/spring-statement/all`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestBody),
+      });
 
       if (!response.ok) {
         const errData = await response.json().catch(() => null);
@@ -189,38 +174,33 @@ export default function SpringStatementCalculator() {
       }
 
       const data = await response.json();
-      setResult(data);
+
+      // Main results
+      setResult(data.main);
       setHasCalculated(true);
 
       // Auto-expand groups that have non-zero change, collapse others
-      const groups = data.program_groups || [];
-      const progs = data.program_structure || [];
+      const groups = data.main.program_groups || [];
+      const progs = data.main.program_structure || [];
       const autoExpanded = {};
       for (const g of groups) {
         const hasChange = progs
           .filter((p) => p.group === g.id)
-          .some((p) => Math.abs(data.impact[p.id] || 0) >= 0.01);
+          .some((p) => Math.abs(data.main.impact[p.id] || 0) >= 0.01);
         autoExpanded[g.id] = hasChange;
       }
       setExpandedGroups(autoExpanded);
+
+      // Multi-year and MTR results
+      if (data.multi_year) setMultiYearData(data.multi_year);
+      if (data.mtr) setMtrData(data.mtr);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
+      setMultiYearLoading(false);
+      setMtrLoading(false);
     }
-
-    // Handle multi-year and MTR requests independently
-    multiYearPromise
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => d && setMultiYearData(d))
-      .catch(() => {})
-      .finally(() => setMultiYearLoading(false));
-
-    mtrPromise
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => d && setMtrData(d))
-      .catch(() => {})
-      .finally(() => setMtrLoading(false));
   }, [
     draftIncome,
     draftChildren,
