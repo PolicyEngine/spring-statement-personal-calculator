@@ -36,7 +36,7 @@ image = (
     timeout=300,
     memory=2048,
     cpu=4,
-    min_containers=1,
+    min_containers=0,
     scaledown_window=300,
 )
 @modal.asgi_app()
