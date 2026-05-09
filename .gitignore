@@ -51,3 +51,4 @@ coverage/
 .coverage
 htmlcov/
 .vercel
+.env*.local
