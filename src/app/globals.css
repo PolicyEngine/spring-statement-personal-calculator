@@ -1,3 +1,6 @@
+@import "tailwindcss";
+@import "@policyengine/ui-kit/theme.css";
+
 * {
   margin: 0;
   padding: 0;
@@ -13,6 +16,19 @@ body {
   line-height: 1.5;
 }
 
-#root {
+#root,
+body {
   min-height: 100vh;
+}
+
+.app {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+@media (max-width: 768px) {
+  .app {
+    padding: 16px;
+  }
 }
